@@ -79,7 +79,7 @@ def main():
     all_results = [] 
 
     #Different exons have different lengths, needs separate processing
-    df["model_input_length"] = df["exon"].astype(str).str.len()
+    df["model_input_length"] = df["exon_with_splice_site"].astype(str).str.len()
 
     for input_length, group in df.groupby("model_input_length"):
         print(
@@ -88,7 +88,7 @@ def main():
         )
 
         #get mutant exons
-        sequences = group["exon"].astype('str').tolist() 
+        sequences = group["exon_with_splice_site"].astype('str').tolist() 
 
         seq_oh, struct_oh, wobbles = create_input_data(
             sequences,

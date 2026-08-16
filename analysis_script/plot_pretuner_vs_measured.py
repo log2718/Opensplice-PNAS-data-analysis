@@ -92,7 +92,7 @@ def main():
         fig.suptitle(exon_id)
         plt.tight_layout()
         
-        out = OUTPUT_DIR / f"{exon_id}_pretuner_vs_measured.png"
+        out = OUTPUT_DIR / f"{exon_id}_with_ss_pretuner_vs_measured.png"
         plt.savefig(
             out,
             dpi=200,
