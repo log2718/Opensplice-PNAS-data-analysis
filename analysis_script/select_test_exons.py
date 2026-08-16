@@ -12,11 +12,11 @@ selected_exons = [
     "NPC1L1_e7",
     "GDPD2_e2",
     "ADGRG3_e3",
-    "ABLIM3_e14" #2 clusters
+    "ABLIM3_e14", #2 clusters
     "TRPM6_e23",
     "SNRNP70_e8",
     "SCN5A_e6",
-    "SCN8A_e6"
+    "SCN8A_e6",
 ]
 
 df = df[df["exon_id"].isin(selected_exons)]
