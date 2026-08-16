@@ -19,3 +19,9 @@ print()
 
 print(df["exon_id"].value_counts())
 print(df["exon_id"].nunique())
+
+#Check how many have valid values for psi
+df = df.dropna(subset=['psi', 'logit_psi'])
+
+print(f'Variants: {len(df)}')
+print(f'Exons: {df['exon_id'].nunique()}')

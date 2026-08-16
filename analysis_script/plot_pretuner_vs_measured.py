@@ -33,8 +33,8 @@ def main():
         axes[0].scatter(
             x,
             y,
-            alpha=0.6, #Transparency
-            s=18, #marker area
+            alpha=0.5, #Transparency
+            s=8, #marker area
         )
 
         # regression line
@@ -76,8 +76,8 @@ def main():
             axes[1].scatter(
                 x_rep,
                 y_rep,
-                alpha=0.6,
-                s=16,
+                alpha=0.45,
+                s=7,
                 color=color,
                 label=(
                     f"{label}: "

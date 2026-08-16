@@ -1,3 +1,8 @@
 #large csv files
 exonic_variants_with_pretuner_with_saturation.csv
 arush_data/exonic_variants.csv
+
+#generated plots and csv
+/outputs/plots
+/outputs/test_exons.csv
+/outputs/test_exons_with_pretuner.csv
