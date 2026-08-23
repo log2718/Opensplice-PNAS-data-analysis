@@ -68,6 +68,64 @@ def get_pretuner(model, x_seq, x_struct, x_wobble):
     return energy_out
 
 #------
+#Returns sumdiff for structure and sequence filters. After softplus.
+#Returns seq_diff, struct_diff, total_diff, and pretuner in the shape of (batch_size,)
+#------
+@torch.no_grad()
+def get_seq_struct_sumdiff(model, x_seq, x_struct, x_wobble):
+    #seq
+    conv_skip_out = (
+        model.conv_skip(x_seq)
+        + model.position_bias_skip.unsqueeze(0)
+    )
+    conv_incl_out = (
+        model.conv_incl(x_seq)
+        + model.position_bias_incl.unsqueeze(0)
+    )
+    seq_skip = model.energy_activation_skip(conv_skip_out)
+    seq_incl = model.energy_activation_incl(conv_incl_out)
+    #sum across filters and positions
+    seq_diff = (
+        seq_incl.sum(dim=(1, 2))
+        - seq_skip.sum(dim=(1, 2))
+    )
+
+    #struct
+    struct_input = torch.cat([x_seq, x_struct, x_wobble], dim=1)
+    conv_struct_skip_out = (
+        model.conv_struct_skip(struct_input)
+        + model.position_bias_skip_struct.unsqueeze(0)
+    )
+    conv_struct_incl_out = (
+        model.conv_struct_incl(struct_input)
+        + model.position_bias_incl_struct.unsqueeze(0)
+    )
+    conv_struct_skip_out = conv_struct_skip_out[:, :, 2:-3]
+    conv_struct_incl_out = conv_struct_incl_out[:, :, 2:-3]
+
+    struct_skip = model.energy_activation_skip(
+        conv_struct_skip_out
+    )
+    struct_incl = model.energy_activation_incl(
+        conv_struct_incl_out
+    )
+    struct_diff = (
+        struct_incl.sum(dim=(1, 2))
+        - struct_skip.sum(dim=(1, 2))
+    )
+
+    #total sumdiff
+    total_diff = seq_diff + struct_diff
+    #pretuner value for checking
+    w = model.energy_seq_struct.w
+    b = model.energy_seq_struct.b
+
+    pretuner = w * total_diff + b
+
+    return seq_diff, struct_diff, total_diff, pretuner
+
+
+#------
 #Main
 #The input will be the exon without the flanks used in the Opensplice experiments
 #------
