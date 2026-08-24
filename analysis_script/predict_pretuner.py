@@ -18,7 +18,8 @@ from PNAS_model.model import PNASModel
 from PNAS_model.utils import create_input_data 
 
 INPUT_CSV = ROOT / "outputs" / "test_exons.csv"
-OUTPUT_CSV = ROOT / "outputs" / "test_exons_with_pretuner.csv"
+#OUTPUT_CSV = ROOT / "outputs" / "test_exons_with_pretuner.csv"
+OUTPUT_CSV = ROOT / "outputs" / "stubborn_75_seq_struct_components.csv"
 WEIGHTS = PNAS_DIR / "model_weights.pt"
 
 
@@ -127,10 +128,20 @@ def get_seq_struct_sumdiff(model, x_seq, x_struct, x_wobble):
 
 #------
 #Main
-#The input will be the exon without the flanks used in the Opensplice experiments
+#The input will be the exon with the flanks used in the Opensplice experiments
 #------
 def main():
-    df = pd.read_csv(INPUT_CSV) 
+    #filter for the 69 stubborn exons
+    df = pd.read_csv(INPUT_CSV)
+    stubborn_ids = pd.read_csv(
+        ROOT / "outputs" / "stubborn_75_exons.csv"
+    )["exon_id"]
+
+    df = df[
+        df["exon_id"].isin(stubborn_ids)
+    ].copy()
+
+    print("Number of exons:", df["exon_id"].nunique())
     device = torch.device(
         "cuda" if torch.cuda.is_available() else "cpu"
     )
@@ -170,7 +181,7 @@ def main():
             dtype=torch.float32,
             device=device,
         )
-        #input length = exon length
+        #input length = exon length + ss context
         input_length = x_seq.shape[-1]
         model = PNASModel(input_length=input_length)
         checkpoint = torch.load(
@@ -196,12 +207,46 @@ def main():
             x_wobble,
         )
 
+        seq_diff, struct_diff, total_diff, reconstructed_pretuner = (
+            get_seq_struct_sumdiff(
+                model,
+                x_seq,
+                x_struct,
+                x_wobble,
+            )
+        )
+
         #results
         result = group.copy()
         result['pretuner'] = (
             pretuner.detach().cpu().numpy()
         )
+
+        result["seq_sumdiff"] = (
+            seq_diff.detach().cpu().numpy()
+        )
+
+        result["struct_sumdiff"] = (
+            struct_diff.detach().cpu().numpy()
+        )
+
+        result["total_sumdiff"] = (
+            total_diff.detach().cpu().numpy()
+        )
+
+        result["pretuner_reconstructed"] = (
+            reconstructed_pretuner.detach().cpu().numpy()
+        )
         all_results.append(result)
+        print(
+            "max reconstruction difference:",
+            torch.max(
+                torch.abs(
+                    pretuner
+                    - reconstructed_pretuner
+                )
+            ).item()
+        )
 
     #put exons of different lengths back together 
     result_df = pd.concat(
