@@ -195,7 +195,7 @@ def main():
             checkpoint,
         )
 
-        # This will automatically resample the learned position biases to the current exon length
+        # Resample learned position biases to the current model input length
         model.load_state_dict(state_dict)
         model.to(device)
         model.eval() 
