@@ -877,6 +877,18 @@ def _order_output_columns(df):
 # CLI demo  (PNAS-only unless --alphagenome and an API key are available)
 # ==========================================================================
 
+#: Progressively wider intronic-context (upstream_w, downstream_w) pairs for the
+#: 3'SS / 5'SS / combined splice-site swaps, on top of the original 7/7 sizing.
+#: Exonic contribution stays fixed at 3 nt on each side. The OpenSplice
+#: downstream flank is only 25 nt, so 25 is the maximum downstream window.
+WIDE_SS_WINDOW_PAIRS: list[tuple[int, int]] = [
+    (20, 20),
+    (30, 25),
+    (50, 25),
+    (70, 25),
+]
+
+
 def _build_demo_constructs(exon_a_id: str, exon_b_id: str, csv_path: Path) -> list[HybridExon]:
     a = load_opensplice_exon(exon_a_id, csv_path)
     b = load_opensplice_exon(exon_b_id, csv_path)
@@ -894,6 +906,30 @@ def _build_demo_constructs(exon_a_id: str, exon_b_id: str, csv_path: Path) -> li
         n_intronic_3ss=7, n_exonic_3ss=3,
         n_exonic_5ss=3, n_intronic_5ss=7,
     ))
+
+    # Progressively wider intronic context (see WIDE_SS_WINDOW_PAIRS). Every
+    # pair gets its own combined 3'SS+5'SS construct. The single-sided
+    # 3'SS-only / 5'SS-only constructs only depend on ONE of the two window
+    # sizes, and several pairs share the same downstream_w (25, the OpenSplice
+    # downstream flank length) or would otherwise repeat an upstream_w already
+    # built -- so each distinct upstream_w / downstream_w value is only built
+    # (and later only scored) once, and is reused across every pair that names
+    # it, instead of re-generating byte-identical duplicate constructs.
+    seen_upstream_w: set[int] = {7}
+    seen_downstream_w: set[int] = {7}
+    for up_w, down_w in WIDE_SS_WINDOW_PAIRS:
+        if up_w not in seen_upstream_w:
+            constructs.append(make_3ss_swap(a, b, n_intronic_3ss=up_w, n_exonic_3ss=3))
+            seen_upstream_w.add(up_w)
+        if down_w not in seen_downstream_w:
+            constructs.append(make_5ss_swap(a, b, n_exonic_5ss=3, n_intronic_5ss=down_w))
+            seen_downstream_w.add(down_w)
+        constructs.append(make_3ss_5ss_swap(
+            a, b,
+            n_intronic_3ss=up_w, n_exonic_3ss=3,
+            n_exonic_5ss=3, n_intronic_5ss=down_w,
+        ))
+
     # Full internal-exon swap: keep exon_a's 3 exonic nt at each SS, replace the
     # whole middle (exon_seq[3:-3]) with exon_b's. Exon length may change.
     constructs.append(make_full_internal_exon_swap(a, b, n_exonic_3ss=3, n_exonic_5ss=3))

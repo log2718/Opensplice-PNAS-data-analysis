@@ -269,6 +269,95 @@ def _panel(ax, x: np.ndarray, y: np.ndarray, y_label: str, fig) -> dict:
     }
 
 
+# Nominal (upstream_w, downstream_w) splice-site swap windows to compare, in
+# increasing order. 25 is the OpenSplice downstream-flank maximum, so it is
+# shared by the three widest pairs -- the underlying 5'SS-only construct is
+# genuinely identical across those three (see run_hybrid_pnas_alphagenome's
+# WIDE_SS_WINDOW_PAIRS dedup), so its row is intentionally repeated verbatim.
+WINDOW_COMPARISON_PAIRS = [(7, 7), (20, 20), (30, 25), (50, 25), (70, 25)]
+
+# (construct_type, swap label, matches-on-upstream, matches-on-downstream)
+WINDOW_COMPARISON_SWAP_KINDS = [
+    ("3ss_swap", "3ss", True, False),
+    ("5ss_swap", "5ss", False, True),
+    ("3ss_5ss_swap", "3ss+5ss", True, True),
+]
+
+WINDOW_COMPARISON_CSV = ROOT / "outputs" / "tp53_hybrid_window_comparison.csv"
+
+
+def _match_window_construct_label(
+    summary: pd.DataFrame,
+    construct_type: str,
+    up_w: int | None,
+    down_w: int | None,
+) -> str | None:
+    """Find the construct_label of ``construct_type`` matching this window.
+
+    ``up_w`` / ``down_w`` of ``None`` means "this swap doesn't touch that
+    side" and is matched against a NaN ``n_intronic_*ss`` (as recorded by
+    ``make_3ss_swap`` / ``make_5ss_swap``, which only set the side they swap).
+    """
+    sub = summary[summary["construct_type"] == construct_type].drop_duplicates("construct_label")
+    for _, row in sub.iterrows():
+        r_up, r_down = row["n_intronic_3ss"], row["n_intronic_5ss"]
+        up_ok = pd.isna(r_up) if up_w is None else (pd.notna(r_up) and int(r_up) == up_w)
+        down_ok = pd.isna(r_down) if down_w is None else (pd.notna(r_down) and int(r_down) == down_w)
+        if up_ok and down_ok:
+            return row["construct_label"]
+    return None
+
+
+def _print_window_comparison_table(summary: pd.DataFrame) -> None:
+    """Compact 7/7 -> 20/20 -> 30/25 -> 50/25 -> 70/25 comparison table.
+
+    One row per (window pair, swap kind), reporting n, both AlphaGenome
+    regression slopes, both Pearson r / Spearman rho, and the three reference
+    (unmutated-construct) scores -- so a widening PNAS-fixed-7nt / AlphaGenome-
+    full-context window can be scanned for whether either the AlphaGenome
+    baseline or the PNAS-vs-AlphaGenome slope actually moves.
+    """
+    rows: list[dict] = []
+    for up_w, down_w in WINDOW_COMPARISON_PAIRS:
+        for construct_type, swap_name, uses_up, uses_down in WINDOW_COMPARISON_SWAP_KINDS:
+            label = _match_window_construct_label(
+                summary, construct_type,
+                up_w if uses_up else None,
+                down_w if uses_down else None,
+            )
+            if label is None:
+                continue
+            grp = summary[summary["construct_label"] == label]
+            mean_row = grp[grp["alphagenome_metric"] == "mean_logit"].iloc[0]
+            prod_row = grp[grp["alphagenome_metric"] == "prod_logit"].iloc[0]
+            rows.append({
+                "window(up/down)": f"{up_w}/{down_w}",
+                "swap": swap_name,
+                "construct_label": label,
+                "n": int(mean_row["n"]),
+                "mean_logit_slope": mean_row["slope"],
+                "prod_logit_slope": prod_row["slope"],
+                "pearson_r_mean": mean_row["pearson_r"],
+                "spearman_rho_mean": mean_row["spearman_rho"],
+                "pearson_r_prod": prod_row["pearson_r"],
+                "spearman_rho_prod": prod_row["spearman_rho"],
+                "ref_pnas_pretuner": mean_row["ref_pnas_pretuner"],
+                "ref_ag_mean_logit": mean_row["ref_alphagenome_mean_logit"],
+                "ref_ag_prod_logit": mean_row["ref_alphagenome_prod_logit"],
+            })
+
+    table = pd.DataFrame(rows)
+    table.to_csv(WINDOW_COMPARISON_CSV, index=False)
+    print(f"\nSaved {WINDOW_COMPARISON_CSV}  ({len(table)} rows)\n")
+    print(
+        "Splice-site swap window comparison "
+        "(upstream_w/downstream_w, increasing) -- PNAS is fixed at 7nt/side "
+        "regardless of window; AlphaGenome sees the full window:\n"
+    )
+    with pd.option_context("display.width", 200):
+        print(table.round(4).to_string(index=False))
+
+
 def main() -> None:
     df = pd.read_csv(INPUT_CSV)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -320,6 +409,19 @@ def main() -> None:
         else:
             plot_df = _exon_snv_rows(group)
 
+        # Reference (unmutated) construct scores -- one row per construct_label.
+        ref_rows = group[group["is_reference"] == True]  # noqa: E712
+        if len(ref_rows) == 1:
+            ref_pnas = float(ref_rows["pnas_pretuner"].iloc[0])
+            ref_mean_logit = float(ref_rows["alphagenome_mean_logit"].iloc[0])
+            ref_prod_logit = float(ref_rows["alphagenome_prod_logit"].iloc[0])
+        else:
+            ref_pnas = ref_mean_logit = ref_prod_logit = float("nan")
+
+        # Swap-window sizes, when applicable (NaN for wt / full_internal_swap).
+        n_intronic_3ss = group["n_intronic_3ss"].iloc[0] if "n_intronic_3ss" in group else np.nan
+        n_intronic_5ss = group["n_intronic_5ss"].iloc[0] if "n_intronic_5ss" in group else np.nan
+
         fig, axes = plt.subplots(1, 2, figsize=(13, 5.5), constrained_layout=True)
         fig.suptitle(
             f"{construct_label}   ({construct_type})\n"
@@ -342,9 +444,14 @@ def main() -> None:
                     "construct_type": construct_type,
                     "library_exon": lib_exon,
                     "variant_subset": subset,
+                    "n_intronic_3ss": n_intronic_3ss,
+                    "n_intronic_5ss": n_intronic_5ss,
                     "alphagenome_metric": short,
                     "alphagenome_column": col,
                     **stats,
+                    "ref_pnas_pretuner": ref_pnas,
+                    "ref_alphagenome_mean_logit": ref_mean_logit,
+                    "ref_alphagenome_prod_logit": ref_prod_logit,
                 }
             )
 
@@ -363,6 +470,8 @@ def main() -> None:
              "slope", "pearson_r", "spearman_rho"]
         ].to_string(index=False)
     )
+
+    _print_window_comparison_table(summary)
 
 
 if __name__ == "__main__":
