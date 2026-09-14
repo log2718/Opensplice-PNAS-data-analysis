@@ -16,6 +16,7 @@ open_splice_experimental_master_unique_sequence_all_predictor_cols.tsv
 
 #env with alphagenome API key
 .env
+.env.alphagenome
 
 #alphagenome model
 /alphagenome
