@@ -1,0 +1,33 @@
+/scratch/yl12316/conda_envs/opensplicerna/lib/python3.11/site-packages/torch/nn/modules/conv.py:380: UserWarning: Using padding='same' with even kernel lengths and odd dilation may require a zero-padded copy of the input be created (Triggered internally at /__w/pytorch/pytorch/aten/src/ATen/native/Convolution.cpp:1104.)
+  return F.conv1d(
+Traceback (most recent call last):
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/analysis_script/plot_hybrid_pnas_vs_alphagenome.py", line 478, in <module>
+    main()
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/analysis_script/plot_hybrid_pnas_vs_alphagenome.py", line 372, in main
+    lib_keys = {
+               ^
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/analysis_script/plot_hybrid_pnas_vs_alphagenome.py", line 373, in <dictcomp>
+    exon_id: _experimental_exonic_sub_keys(exon_id, seq)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/analysis_script/plot_hybrid_pnas_vs_alphagenome.py", line 170, in _experimental_exonic_sub_keys
+    lib = _library_exonic_subs()
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/analysis_script/plot_hybrid_pnas_vs_alphagenome.py", line 153, in _library_exonic_subs
+    lib = pd.read_csv(
+          ^^^^^^^^^^^^
+  File "/scratch/yl12316/conda_envs/opensplicerna/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 1026, in read_csv
+    return _read(filepath_or_buffer, kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/yl12316/conda_envs/opensplicerna/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 620, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/yl12316/conda_envs/opensplicerna/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 1620, in __init__
+    self._engine = self._make_engine(f, self.engine)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/yl12316/conda_envs/opensplicerna/lib/python3.11/site-packages/pandas/io/parsers/readers.py", line 1880, in _make_engine
+    self.handles = get_handle(
+                   ^^^^^^^^^^^
+  File "/scratch/yl12316/conda_envs/opensplicerna/lib/python3.11/site-packages/pandas/io/common.py", line 873, in get_handle
+    handle = open(
+             ^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/scratch/yl12316/Opensplice-PNAS-data-analysis/outputs/test_exons_with_pretuner.csv'

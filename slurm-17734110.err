@@ -1,0 +1,28 @@
+Traceback (most recent call last):
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/analysis_script/run_hybrid_pnas_alphagenome.py", line 998, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/analysis_script/run_hybrid_pnas_alphagenome.py", line 974, in main
+    df = score_hybrid_variants(
+         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/analysis_script/run_hybrid_pnas_alphagenome.py", line 756, in score_hybrid_variants
+    pnas_scores = pnas.score_pnas_pretuner_batch(
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/analysis_script/pnas_prediction_hybrid_input.py", line 298, in score_pnas_pretuner_batch
+    seq_oh, struct_oh, wobbles = create_input_data(
+                                 ^^^^^^^^^^^^^^^^^^
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/PNAS_model/utils.py", line 593, in create_input_data
+    dataset = make_dataset_dict(
+              ^^^^^^^^^^^^^^^^^^
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/PNAS_model/utils.py", line 471, in make_dataset_dict
+    struct_oh, structures, mfes = compute_structure(
+                                  ^^^^^^^^^^^^^^^^^^
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/PNAS_model/utils.py", line 309, in compute_structure
+    structures, mfes = rna_fold_structs(
+                       ^^^^^^^^^^^^^^^^^
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/PNAS_model/utils.py", line 275, in rna_fold_structs
+    struct_mfes = RNAfold(
+                  ^^^^^^^^
+  File "/scratch/yl12316/Opensplice-PNAS-data-analysis/PNAS_model/utils.py", line 166, in RNAfold
+    raise FileNotFoundError(
+FileNotFoundError: Could not find RNAfold executable 'RNAfold'. Install ViennaRNA and ensure `RNAfold` is on PATH, or pass `RNAfold_bin` explicitly.

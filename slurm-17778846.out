@@ -1,0 +1,20 @@
+Job ID: 17778846
+Node: cs695.hpc.nyu.edu
+Start: Mon Sep 14 10:28:55 EDT 2026
+Python: /scratch/yl12316/conda_envs/opensplicerna/bin/python
+Python 3.11.16
+16 constructs -> 5296 variant rows
+construct_type construct_label mutation_region  position  ref  alt  pnas_pretuner  pnas_pretuner_delta  alphagenome_mean_logit  alphagenome_mean_logit_delta
+            wt         TP53_e7       reference       NaN None None       5.608345             0.000000                0.237969                      0.000000
+            wt         TP53_e7            exon       1.0    G    A       6.204265             0.595920                0.157355                     -0.080614
+            wt         TP53_e7            exon       1.0    G    C       7.991640             2.383295               -0.335317                     -0.573287
+            wt         TP53_e7            exon       1.0    G    T       5.473502            -0.134843               -0.467975                     -0.705945
+            wt         TP53_e7            exon       2.0    T    A       6.405922             0.797577                0.054843                     -0.183126
+            wt         TP53_e7            exon       2.0    T    C       6.267651             0.659306                0.221296                     -0.016673
+            wt         TP53_e7            exon       2.0    T    G       6.520079             0.911734                0.023442                     -0.214527
+            wt         TP53_e7            exon       3.0    T    A       4.561544            -1.046801                0.093911                     -0.144058
+            wt         TP53_e7            exon       3.0    T    C       7.074508             1.466163                0.301839                      0.063870
+            wt         TP53_e7            exon       3.0    T    G       6.217124             0.608779                0.110160                     -0.127809
+            wt         TP53_e7            exon       4.0    G    A       4.091571            -1.516774                0.336625                      0.098656
+            wt         TP53_e7            exon       4.0    G    C       7.668378             2.060033                0.318506                      0.080537
+wrote 5296 rows -> /scratch/yl12316/Opensplice-PNAS-data-analysis/outputs/tp53_hybrid_scores_with_alphagenome.csv
