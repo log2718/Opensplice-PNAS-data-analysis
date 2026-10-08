@@ -95,6 +95,33 @@ class Thresholds:
     n_boot: int = 2000
 
 
+    @classmethod
+    def for_metric(cls, metric: str = "prod_logit", **overrides) -> "Thresholds":
+        """Thresholds rescaled for a different AlphaGenome y-metric.
+
+        Only the thresholds expressed in LOGIT UNITS are rescaled; ratios and
+        counts (``branch_frac``, ``slope_frac``, ``min_plateau_bins``,
+        ``min_plateau_xfrac``, ``target_bin_n``) are scale-free and unchanged.
+
+        ``mean_logit = (logit(p_acc) + logit(p_don)) / 2`` while
+        ``prod_logit = logit(p_acc * p_don) ~= logit(p_acc) + logit(p_don)`` in
+        the small-probability regime, so mean_logit occupies roughly half the
+        scale. The factor below is MEASURED on the synthetic-context data
+        (IQR ratio 0.513 endpoint / 0.518 chimera; smoothed-response-range
+        ratio 0.560), not assumed.
+        """
+        factor = {"prod_logit": 1.0, "mean_logit": 0.55}.get(metric)
+        if factor is None:
+            raise ValueError(f"unknown metric {metric!r}")
+        t = cls()
+        for f in ("branch_drop", "flat_range", "still_changing_delta",
+                  "max_plateau_dose_span"):
+            setattr(t, f, round(getattr(t, f) * factor, 4))
+        for k, v in overrides.items():
+            setattr(t, k, v)
+        return t
+
+
 @dataclass
 class Plateau:
     present: bool = False
@@ -145,7 +172,7 @@ class Result:
 # building blocks
 # ==========================================================================
 
-def _bin_curve(df: pd.DataFrame, t: Thresholds) -> pd.DataFrame:
+def _bin_curve(df: pd.DataFrame, t: Thresholds, y_col: str = Y_COL) -> pd.DataFrame:
     """Equal-count (quantile) bins along PNAS, with a lightly smoothed median.
 
     Quantile rather than equal-width bins because PNAS density is very uneven
@@ -155,10 +182,10 @@ def _bin_curve(df: pd.DataFrame, t: Thresholds) -> pd.DataFrame:
     nb = int(np.clip(len(df) // t.target_bin_n, t.min_bins, t.max_bins))
     q = pd.qcut(df[X_COL], nb, duplicates="drop")
     g = (df.groupby(q, observed=True)
-           .agg(bx=(X_COL, "median"), by=(Y_COL, "median"),
-                lo=(Y_COL, lambda v: v.quantile(.25)),
-                hi=(Y_COL, lambda v: v.quantile(.75)),
-                n=(Y_COL, "size"))
+           .agg(bx=(X_COL, "median"), by=(y_col, "median"),
+                lo=(y_col, lambda v: v.quantile(.25)),
+                hi=(y_col, lambda v: v.quantile(.75)),
+                n=(y_col, "size"))
            .reset_index(drop=True))
     # Rolling median of 3: removes single-bin spikes while preserving a sharp
     # transition. A spline/LOWESS would round off exactly the sharp 4x->8x
@@ -169,7 +196,8 @@ def _bin_curve(df: pd.DataFrame, t: Thresholds) -> pd.DataFrame:
     return g
 
 
-def _branch_score(df: pd.DataFrame, curve_bins: pd.Series, t: Thresholds) -> float:
+def _branch_score(df: pd.DataFrame, curve_bins: pd.Series, t: Thresholds,
+                  y_col: str = Y_COL) -> float:
     """Mean per-bin fraction of variants far below their own local median.
 
     A fixed logit drop (not a multiple of the local IQR) because when a branch
@@ -179,8 +207,8 @@ def _branch_score(df: pd.DataFrame, curve_bins: pd.Series, t: Thresholds) -> flo
     """
     fracs = []
     for _, s in df.groupby(curve_bins, observed=True):
-        med = s[Y_COL].median()
-        fracs.append((s[Y_COL] < med - t.branch_drop).mean())
+        med = s[y_col].median()
+        fracs.append((s[y_col] < med - t.branch_drop).mean())
     return float(np.mean(fracs)) if fracs else 0.0
 
 
@@ -211,14 +239,14 @@ def _bootstrap_median(values: np.ndarray, n_boot: int, rng) -> tuple[float, floa
 
 
 def _describe_plateau(df: pd.DataFrame, curve: pd.DataFrame, lo_i: int, hi_i: int,
-                      side: str, t: Thresholds, rng) -> Plateau:
+                      side: str, t: Thresholds, rng, y_col: str = Y_COL) -> Plateau:
     seg = curve.iloc[lo_i:hi_i + 1]
     x_lo, x_hi = seg.bx.min(), seg.bx.max()
     total_x = curve.bx.max() - curve.bx.min()
     # level estimated from the RAW variants in the plateau x-window, not the
     # smoothed bin medians
     raw = df[(df[X_COL] >= x_lo) & (df[X_COL] <= x_hi)]
-    vals = raw[Y_COL].to_numpy()
+    vals = raw[y_col].to_numpy()
 
     n_cens = int(np.sum(np.abs(vals - CENSOR_VALUE) < CENSOR_TOL))
     censored = n_cens / max(len(vals), 1) > 0.10
@@ -240,7 +268,7 @@ def _describe_plateau(df: pd.DataFrame, curve: pd.DataFrame, lo_i: int, hi_i: in
         p.nx_levels = ",".join(f"{int(v)}x" for v in lv)
         p.nx_median = float(np.median(raw.copy_number))
         if len(lv) > 1:
-            per_dose = raw.groupby("copy_number")[Y_COL].median()
+            per_dose = raw.groupby("copy_number")[y_col].median()
             p.dose_span = float(per_dose.max() - per_dose.min())
     # onset = first bin beyond the plateau (where the curve starts moving)
     if side == "left" and hi_i + 1 < len(curve):
@@ -255,11 +283,19 @@ def _describe_plateau(df: pd.DataFrame, curve: pd.DataFrame, lo_i: int, hi_i: in
 # ==========================================================================
 
 def detect(df: pd.DataFrame, exon_id: str = "", motif_family: str = "",
-           t: Thresholds | None = None, seed: int = 0) -> Result:
+           t: Thresholds | None = None, seed: int = 0,
+           y_col: str = Y_COL) -> Result:
+    """Classify one x-vs-y relationship.
+
+    ``y_col`` selects the AlphaGenome metric; pair it with
+    ``Thresholds.for_metric(...)`` so the logit-unit thresholds match the
+    metric's scale. Defaults reproduce the original prod_logit analysis.
+    """
     t = t or Thresholds()
     rng = np.random.default_rng(seed)
 
-    df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=[X_COL, Y_COL])
+    df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=[X_COL, y_col])
+    res_y_col = y_col
     res = Result(exon_id=exon_id, motif_family=motif_family, n_variants=len(df))
     warn: list[str] = []
 
@@ -268,7 +304,7 @@ def detect(df: pd.DataFrame, exon_id: str = "", motif_family: str = "",
     res.highest_nx = int(max(levels)) if levels else 0
 
     x = df[X_COL].to_numpy()
-    y = df[Y_COL].to_numpy()
+    y = df[y_col].to_numpy()
     if len(df) >= 3:
         res.global_slope = float(np.polyfit(x, y, 1)[0])
 
@@ -282,7 +318,7 @@ def detect(df: pd.DataFrame, exon_id: str = "", motif_family: str = "",
                         f"plateau from transition")
         return res
 
-    curve = _bin_curve(df, t)
+    curve = _bin_curve(df, t, y_col)
     res.curve = curve
     res.global_response_range = float(curve.sy.max() - curve.sy.min())
     res.flatness_score = res.global_response_range
@@ -290,7 +326,7 @@ def detect(df: pd.DataFrame, exon_id: str = "", motif_family: str = "",
     # --- gate 2: multimodality -------------------------------------------
     nb = len(curve)
     q = pd.qcut(df[X_COL], nb, duplicates="drop")
-    res.branch_score = _branch_score(df, q, t)
+    res.branch_score = _branch_score(df, q, t, y_col)
     if res.branch_score >= t.branch_frac:
         res.multimodal_flag = True
         res.classification = "AMBIGUOUS_OR_MULTIMODAL"
@@ -304,8 +340,8 @@ def detect(df: pd.DataFrame, exon_id: str = "", motif_family: str = "",
 
     # --- still changing at the top dose? ---------------------------------
     if len(levels) >= 2:
-        m_top = df[df.copy_number == levels[-1]][Y_COL].median()
-        m_prev = df[df.copy_number == levels[-2]][Y_COL].median()
+        m_top = df[df.copy_number == levels[-1]][y_col].median()
+        m_prev = df[df.copy_number == levels[-2]][y_col].median()
         res.still_changing_at_highest_nx = abs(m_top - m_prev) > t.still_changing_delta
         if res.still_changing_at_highest_nx:
             warn.append(f"still changing at {int(levels[-1])}x "
@@ -347,10 +383,10 @@ def detect(df: pd.DataFrame, exon_id: str = "", motif_family: str = "",
         left_ok = right_ok = False
 
     if left_ok:
-        res.left = _describe_plateau(df, curve, 0, nl - 1, "left", t, rng)
+        res.left = _describe_plateau(df, curve, 0, nl - 1, "left", t, rng, y_col)
     if right_ok:
         res.right = _describe_plateau(df, curve, len(curve) - nr, len(curve) - 1,
-                                      "right", t, rng)
+                                      "right", t, rng, y_col)
 
     res.classification = {(True, True): "BOTH_SIDES",
                           (True, False): "LEFT_SATURATION",
@@ -359,7 +395,7 @@ def detect(df: pd.DataFrame, exon_id: str = "", motif_family: str = "",
 
     for side, p in (("left", res.left), ("right", res.right)):
         if p.present and p.censored:
-            warn.append(f"{side} plateau sits on the -16.118 clip: "
+            warn.append(f"{side} plateau sits on the {CENSOR_VALUE:.3f} clip: "
                         f"OBSERVED_LOWER_BOUND, not a biological saturation level")
         if p.present and np.isfinite(p.dose_span) and p.dose_span > t.max_plateau_dose_span:
             warn.append(f"{side} plateau spans {p.dose_span:.1f} logit across the doses it "
