@@ -249,34 +249,51 @@ def part5_median_distribution(ep: pd.DataFrame, full: pd.DataFrame) -> pd.DataFr
 
     style = {"e6": ("#f0c000", 46, "e6 chimeras"),
              "e7": ("#2f6fd0", 46, "e7 chimeras"),
-             "original": ("black", 110, "original contexts")}
+             "original": ("black", 120, "10k endpoint reference runs")}
+    chim = tab[tab.group != "original"]
+    endp = tab[tab.group == "original"]
 
-    fig, ax = plt.subplots(figsize=(11, 6.0), constrained_layout=True)
-    ax.hist(tab.median_AG_mean_logit, bins=26, color="0.84",
-            edgecolor="white", linewidth=.8, zorder=1)
+    # Two rows on a shared x. The y axes mean different things, so they get
+    # separate panels rather than being overlaid: counts on top, one dot per
+    # context on the bottom strip (its y is categorical jitter only).
+    fig, (ax_h, ax_s) = plt.subplots(
+        2, 1, figsize=(11, 6.4), sharex=True,
+        gridspec_kw={"height_ratios": [3.2, 1.0], "hspace": 0.08},
+        constrained_layout=True)
 
-    # dot strip below the histogram, jittered so overlapping contexts stay visible
-    top = ax.get_ylim()[1]
-    band_lo, band_hi = -0.22 * top, -0.03 * top
+    ax_h.hist(chim.median_AG_mean_logit, bins=26, color="0.84",
+              edgecolor="white", linewidth=.8, zorder=1)
+    for _, r in endp.iterrows():
+        ax_h.axvline(r.median_AG_mean_logit, color="black", lw=1.4,
+                     ls="--", zorder=3)
+    ax_h.plot([], [], color="black", lw=1.4, ls="--",
+              label=f"{style['original'][2]} (n={len(endp)})")
+    ax_h.set_ylabel("number of contexts")
+    ax_h.set_title(f"chimera contexts, n = {len(chim)}", fontsize=9, color="0.25")
+    ax_h.legend(frameon=False, fontsize=9, loc="upper left")
+    ax_h.grid(axis="y", alpha=.25)
+    ax_h.set_axisbelow(True)
+
     rng = np.random.default_rng(0)
     for grp in ("e6", "e7", "original"):
         g = tab[tab.group == grp]
         col, size, lab = style[grp]
-        yy = rng.uniform(band_lo, band_hi, len(g))
-        ax.scatter(g.median_AG_mean_logit, yy, s=size, color=col,
-                   edgecolor="black", linewidth=.55 if grp != "original" else .9,
-                   zorder=4 if grp == "original" else 3, label=f"{lab} (n={len(g)})")
-    ax.axhline(0, color="0.5", lw=.8, zorder=2)
-    ax.set_ylim(band_lo * 1.25, top * 1.05)
+        yy = rng.uniform(0.15, 0.85, len(g))
+        ax_s.scatter(g.median_AG_mean_logit, yy, s=size, color=col,
+                     edgecolor="black", linewidth=.55 if grp != "original" else .9,
+                     zorder=4 if grp == "original" else 3,
+                     label=f"{lab} (n={len(g)})")
+    ax_s.set_ylim(0, 1)
+    ax_s.set_yticks([])
+    ax_s.set_ylabel("contexts", fontsize=9)
+    ax_s.set_xlabel("median AlphaGenome mean-logit")
+    ax_s.legend(frameon=False, fontsize=8.5, loc="upper center",
+                bbox_to_anchor=(0.5, -0.32), ncol=3)
+    ax_s.grid(axis="x", alpha=.25)
+    ax_s.set_axisbelow(True)
 
-    ax.set_xlabel("median AlphaGenome mean-logit")
-    ax.set_ylabel("number of contexts")
-    ax.set_title(f"n = {len(tab)} contexts", fontsize=9, color="0.25")
     fig.suptitle("Distribution of context median AlphaGenome mean-logit",
                  fontsize=14, fontweight="bold")
-    ax.legend(frameon=False, fontsize=9, loc="upper left")
-    ax.grid(axis="y", alpha=.25)
-    ax.set_axisbelow(True)
     fig.savefig(P_SUM / "context_median_mean_logit_distribution.png",
                 dpi=180, bbox_inches="tight")
     plt.close(fig)
