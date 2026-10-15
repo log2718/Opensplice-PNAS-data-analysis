@@ -1,0 +1,39 @@
+8-BLOCK CHIMERA RUN -- PRE-SUBMISSION VALIDATION
+==============================================================================
+  [PASS]  1. 256 labels exist for e6  -- 256 labels
+  [PASS]  2. 256 labels exist for e7  -- 256 labels
+  [PASS]  3. same 400 sequence IDs in every context  -- 1 distinct ID set(s) across 512 contexts
+  [PASS]  4. PPPPPPPP reconstructs the original 1,309-nt PNAS construct byte-for-byte  -- len=1309
+  [PASS]  5. FFFFFFFF reconstructs the TP53_e6 FAS construct byte-for-byte  -- len=471
+  [PASS]  6. FFFFFFFF reconstructs the TP53_e7 FAS construct byte-for-byte  -- len=471
+  [PASS]  7. B2 and B5 are exactly 9 nt (3 exonic + 6 intronic) in all contexts
+  [PASS]  8. B4 and B7 are exactly 23 nt (20 intronic + 3 exonic) in all contexts
+  [PASS]  9. synthetic70 is exactly 70 nt and appears exactly once in all 512 contexts  -- 0 bad
+  [PASS] 10. GTT belongs entirely to B4  -- 0 bad
+  [PASS] 11. CAG belongs entirely to B5  -- 0 bad
+  [PASS] 12. no base lost or duplicated in any of the 256 contexts (both arms)  -- 0 bad
+  [PASS] 12. core lengths are exactly as specified (PNAS 1309 / FAS 471 at the endpoints)
+  [PASS] 13. all 8 blocks genuinely differ P vs F in both arms  -- {'TP53_e6': [], 'TP53_e7': []}
+        reusable contexts verified by construct digest:
+          TP53_e6 FFFFFFFF  ==  6-block FFFFFF  (400 exons, from synthetic_endpoint_ag_results.csv)
+          TP53_e6 FFFFPPPP  ==  6-block FFFPPP  (400 exons, from chimera_ag_results.csv)
+          TP53_e6 PPPPFFFF  ==  6-block PPPFFF  (400 exons, from chimera_ag_results.csv)
+          TP53_e6 PPPPPPPP  ==  6-block PPPPPP  (400 exons, from synthetic_endpoint_ag_results.csv)
+          TP53_e7 FFFFFFFF  ==  6-block FFFFFF  (400 exons, from synthetic_endpoint_ag_results.csv)
+          TP53_e7 FFFFPPPP  ==  6-block FFFPPP  (400 exons, from chimera_ag_results.csv)
+          TP53_e7 PPPPFFFF  ==  6-block PPPFFF  (400 exons, from chimera_ag_results.csv)
+          TP53_e7 PPPPPPPP  ==  6-block PPPPPP  (400 exons, from synthetic_endpoint_ag_results.csv)
+  [PASS] 14. exact list of reusable old contexts verified by sequence equality  -- 8 (arm,label) cells, 7 distinct constructs per exon
+  [PASS] 15. cross-arm duplicate constructs verified by sequence equality  -- 16 labels x 400 exons = 6400 shared constructs
+        shared labels (B3..B6 all P): FFPPPPFF, FFPPPPFP, FFPPPPPF, FFPPPPPP, FPPPPPFF, FPPPPPFP, FPPPPPPF, FPPPPPPP, PFPPPPFF, PFPPPPFP, PFPPPPPF, PFPPPPPP, PPPPPPFF, PPPPPPFP, PPPPPPPF, PPPPPPPP
+  [PASS] 16. exact number of distinct new AG calls  -- 204,800 cells = 3,200 reused + 201,600 new cells -> 195,600 distinct calls (489/exon)
+        expected pure AG runtime:
+          0.38 s/call ->    74,328 s =  20.6 h | 12 shards -> 1.72 h each
+          0.51 s/call ->    99,756 s =  27.7 h | 12 shards -> 2.31 h each
+          0.60 s/call ->   117,360 s =  32.6 h | 12 shards -> 2.72 h each
+  [PASS] 17. expected runtime computed at 0.38 / 0.51 / 0.60 s per call
+  [PASS] 18. output files cannot overwrite old 6-block data  -- all writes under outputs/synthetic_context_8block/
+  [PASS] 19. resume logic cannot duplicate already completed calls  -- job_row_id is the unique resume key; the runner skips any row_id already present in its shard CSV and re-verifies the SHA-256
+  [PASS] 20. AG requested output is SPLICE_SITES only  -- synthetic_context_lib.score_core, unchanged
+==============================================================================
+ALL 20 CHECKS PASSED
