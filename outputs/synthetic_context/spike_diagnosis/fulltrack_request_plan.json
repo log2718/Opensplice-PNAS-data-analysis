@@ -1,0 +1,34 @@
+{
+  "status": "PREPARED_NOT_RUN",
+  "n_representatives": 20,
+  "contexts": [
+    "PNAS",
+    "TP53_e6",
+    "TP53_e7"
+  ],
+  "n_alphagenome_calls": 60,
+  "requested_output": "SPLICE_SITES (full track, not only intended positions)",
+  "sequence_ids": [
+    "syn_a0.1_00179",
+    "syn_a0.1_00496",
+    "syn_a0.1_01809",
+    "syn_a0.1_01258",
+    "syn_a0.1_02438",
+    "syn_a0.1_00121",
+    "syn_a0.1_02038",
+    "syn_a0.1_00157",
+    "syn_a0.1_00545",
+    "syn_a0.1_02166",
+    "syn_a0.1_00578",
+    "syn_a0.1_02022",
+    "syn_a0.1_01783",
+    "syn_a0.1_01634",
+    "syn_a0.1_01524",
+    "syn_a0.1_02462",
+    "syn_a0.1_01001",
+    "syn_a0.1_01186",
+    "syn_a0.1_00655",
+    "syn_a0.1_00474"
+  ],
+  "runner": "analysis_script/run_spike_fulltrack_diagnostic.py"
+}

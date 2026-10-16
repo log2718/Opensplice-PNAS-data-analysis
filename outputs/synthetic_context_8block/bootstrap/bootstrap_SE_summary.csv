@@ -1,0 +1,3 @@
+comparison,n_contexts,SE_min,SE_median,SE_max,SE_mean
+TP53_e6,256,0.083767,0.147161,0.19827,0.147661
+TP53_e7,256,0.080738,0.146648,0.224916,0.148254

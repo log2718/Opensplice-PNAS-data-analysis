@@ -1,0 +1,6 @@
+homopolymer_class,delta_PNAS_minus_e6_median,delta_PNAS_minus_e6_std,delta_PNAS_minus_e6_count,delta_PNAS_minus_e7_median,delta_PNAS_minus_e7_std,delta_PNAS_minus_e7_count
+mixed,2.4799,1.8514,1926,1.7384,1.437,1926
+polyA,0.7794,0.4227,138,0.5729,0.3318,138
+polyC,-0.0213,0.1336,143,-0.0685,0.1243,143
+polyG,-0.3145,0.1281,146,-0.4021,0.1369,146
+polyT,0.0884,0.1681,147,-0.1211,0.1745,147
