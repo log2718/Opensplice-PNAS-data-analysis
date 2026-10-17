@@ -174,7 +174,8 @@ def effect_matrix(eff: pd.DataFrame) -> np.ndarray:
     return m
 
 
-def plot_heatmap(m: np.ndarray, arm: str, vmax: float, path: Path) -> None:
+def plot_heatmap(m: np.ndarray, arm: str, vmax: float, path: Path,
+                 display: str | None = None) -> None:
     norm = TwoSlopeNorm(vmin=-vmax, vcenter=0.0, vmax=vmax)
     fig, ax = plt.subplots(figsize=(9.6, 8.4), dpi=190)
     im = ax.imshow(m, cmap=DIVERGING, norm=norm)
@@ -206,6 +207,7 @@ def plot_heatmap(m: np.ndarray, arm: str, vmax: float, path: Path) -> None:
     cb.ax.tick_params(colors=MUTED, labelsize=8)
 
     digit = ARM_SLUG[arm][-1]
+    shown = display or arm
     ax.set_title(
         "diagonal: mean(median | Bi=F) − mean(median | Bi=P)   ·   "
         "off-diagonal: mean over 64 backgrounds of "
@@ -216,7 +218,7 @@ def plot_heatmap(m: np.ndarray, arm: str, vmax: float, path: Path) -> None:
         fontsize=9, color=MUTED, pad=13, linespacing=1.6)
     ax.title.set_color(MUTED)
     # the first title line carries the figure name, so re-draw it bold on top
-    ax.annotate(f"{arm} — block main effects (boxed diagonal) and pairwise "
+    ax.annotate(f"{shown} — block main effects (boxed diagonal) and pairwise "
                 "interactions",
                 xy=(0.5, 1.0), xycoords="axes fraction",
                 xytext=(0, 42), textcoords="offset points",
