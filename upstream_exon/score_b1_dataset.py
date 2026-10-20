@@ -22,6 +22,8 @@ Usage::
 from __future__ import annotations
 
 import argparse
+import atexit
+import os
 import sys
 from pathlib import Path
 
@@ -105,9 +107,15 @@ def main() -> int:
                     help="score only this many rows (alpha-stratified); "
                          "results append to the same CSV, so a smoke run's "
                          "calls count toward the full job")
+    ap.add_argument("--max-new-calls", type=int, default=None,
+                    help="score at most this many NOT-YET-SCORED rows, taken "
+                         "in manifest order. Lets one SLURM job fit inside a "
+                         "walltime cap; chain jobs sequentially to finish.")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--env-path", default=str(ROOT / ".env.alphagenome"))
     ap.add_argument("--flush-every", type=int, default=50)
+    ap.add_argument("--no-lock", action="store_true",
+                    help="skip the concurrency lock (not recommended)")
     args = ap.parse_args()
 
     man_name, res_name, fail_name = NAMES[args.mode]
@@ -118,31 +126,68 @@ def main() -> int:
 
     man = pd.read_csv(man_path)
     syn70 = exon_syn70(man.sequence_id.iloc[0])
-    subset = stratified_head(man, args.limit) if args.limit else man
+    res_path = DATA / res_name
 
+    # --- what is already done ------------------------------------------
+    done_ids: set[str] = set()
+    if res_path.exists():
+        done_ids = set(pd.read_csv(res_path, usecols=["row_id"]).row_id)
+    total = len(man)
+    pending = man[~man.row_id.isin(done_ids)]
+
+    print(f"[state]  manifest {total} rows | already scored {len(done_ids)} "
+          f"| remaining {len(pending)}")
+
+    # --- select this invocation's slice --------------------------------
+    subset = stratified_head(pending, args.limit) if args.limit else pending
+    if args.max_new_calls is not None:
+        subset = subset.head(args.max_new_calls)
+
+    if subset.empty:
+        print("[plan]   nothing left to score -- dataset is complete")
+        print(f"[plan]   MAXIMUM NEW ALPHAGENOME CALLS: 0")
+        return 0
+
+    # Only unscored constructs are rebuilt, so a resumed job does not pay to
+    # re-verify the whole manifest before making its first call.
     jobs = build_jobs(subset, syn70)
     print(f"[verify] {len(jobs)} constructs rebuilt and SHA-256 verified")
     print(f"[plan]   middle exon {man.sequence_id.iloc[0]}, "
           f"alpha mix {subset.alpha.value_counts().sort_index().to_dict()}")
-
-    res_path = DATA / res_name
-    already = 0
-    if res_path.exists():
-        already = len(pd.read_csv(res_path))
-    todo = len([j for j in jobs if True]) - 0
-    print(f"[plan]   {already} rows already scored; this invocation covers "
-          f"{len(jobs)} manifest rows")
-    print(f"[plan]   MAXIMUM NEW ALPHAGENOME CALLS: "
-          f"{max(len(jobs) - already, 0)}")
+    print(f"[plan]   MAXIMUM NEW ALPHAGENOME CALLS: {len(jobs)}")
+    print(f"[plan]   after this job: "
+          f"{len(done_ids) + len(jobs)}/{total} labeled")
 
     if args.dry_run:
         print("[dry-run] no AlphaGenome calls made")
         return 0
 
+    # --- refuse to run two scorers against one results CSV -------------
+    lock = res_path.with_suffix(".lock")
+    if not args.no_lock:
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            raise SystemExit(
+                f"FATAL: {lock} exists -- another scoring process is writing "
+                f"to {res_path.name}.\n"
+                "       Wait for it, or delete the lock if it is stale.")
+        os.write(fd, f"pid={os.getpid()} host={os.uname().nodename}\n"
+                     f"slurm_job={os.environ.get('SLURM_JOB_ID', 'none')}\n"
+                     .encode())
+        os.close(fd)
+        atexit.register(lambda: lock.unlink(missing_ok=True))
+
     df = L.run_scoring(jobs, res_path, args.env_path,
                        flush_every=args.flush_every,
                        failed_csv=DATA / fail_name)
-    print(f"\n[score] {len(df)} rows now in {res_path}")
+    n_now = len(df)
+    print(f"\n[score] {n_now} rows now in {res_path}")
+    if n_now >= total:
+        print(f"[score] COMPLETE: {n_now}/{total} labeled")
+    else:
+        print(f"[score] INCOMPLETE: {n_now}/{total} labeled, "
+              f"{total - n_now} remaining -- submit another scoring job")
     if D_ok(df):
         print(f"[score] AG_mean_logit: mean {df.AG_mean_logit.mean():+.4f}  "
               f"sd {df.AG_mean_logit.std():.4f}  "

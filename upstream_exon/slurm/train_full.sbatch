@@ -3,9 +3,9 @@
 #SBATCH --account=torch_pr_352_general
 #SBATCH --partition=l40s_public
 #SBATCH --gres=gpu:l40s:1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
-#SBATCH --time=08:00:00
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=24G
+#SBATCH --time=04:00:00
 #SBATCH --requeue
 #SBATCH --open-mode=append
 #SBATCH --output=logs/b1_full_%j.out
@@ -20,9 +20,12 @@
 # Model  : conv(4->20,k=6) x2 + learned position bias -> Softplus -> SumDiff
 #          -> Linear(1,1).  5,324 parameters, trained from scratch.
 #
-# GPU request is the explicit L40S form (--gres=gpu:l40s:1), matching the
-# allocation that has worked on this account. If the generic form is needed
-# instead, change it to --gres=gpu:1.
+# RESOURCES track the allocation confirmed to work on this account:
+#   --partition=l40s_public --gres=gpu:l40s:1 --cpus-per-task=4
+# Memory is raised to 24G (above the known-good 12G) because the k-mer
+# baseline builds a 27,000 x 4,096 design matrix. If that is rejected, drop
+# it -- the CNN itself needs well under 2G:
+#   sbatch --mem=12G upstream_exon/slurm/train_full.sbatch --skip-baselines
 #
 # RESUME: --requeue alone does NOT make the trainer continue from a
 # checkpoint; it only re-runs the script. This script therefore detects
@@ -108,7 +111,7 @@ srun python upstream_exon/train_upstream.py \
     --l2-smooth 1e-3 \
     --loss mse \
     --kmer-k 6 \
-    --num-workers 8 \
+    --num-workers 4 \
     --seed 42 \
     "${RESUME_ARG[@]+"${RESUME_ARG[@]}"}" \
     "$@"

@@ -1,35 +1,54 @@
 #!/bin/bash
 #SBATCH --job-name=b1_score
 #SBATCH --account=torch_pr_352_general
-#SBATCH --partition=cpu_public
-#SBATCH --cpus-per-task=2
-#SBATCH --mem=8G
-#SBATCH --time=12:00:00
+#SBATCH --partition=l40s_public
+#SBATCH --gres=gpu:l40s:1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=12G
+#SBATCH --time=04:00:00
 #SBATCH --requeue
 #SBATCH --open-mode=append
 #SBATCH --output=logs/b1_score_%j.out
 #SBATCH --error=logs/b1_score_%j.err
 #
-# AlphaGenome labeling of the 40,000-sequence B1 library, on the cluster.
+# AlphaGenome labeling of the 40,000-sequence B1 library, on compute nodes.
 #
-# This job is NOT compute-bound: it is a single stream of gRPC calls to the
-# AlphaGenome API, so it needs OUTBOUND INTERNET from the compute node. It
-# requests no GPU on purpose -- one would sit idle for the whole job.
+# ---------------------------------------------------------------------------
+# WHY THIS ASKS FOR A GPU IT WILL NOT USE
+# ---------------------------------------------------------------------------
+# This job is pure network I/O: a single stream of gRPC calls to the
+# AlphaGenome API. It needs no GPU and barely any CPU. But `cpu_public` does
+# not exist on this cluster, and the only allocation confirmed to work on
+# account torch_pr_352_general is:
 #
-# Run check_connectivity.sbatch FIRST. If compute nodes cannot reach the API,
-# this job fails fast with a clear message instead of burning its walltime,
-# and the fallback is to score locally and rsync the CSV across (see README).
+#     --partition=l40s_public --gres=gpu:l40s:1 --cpus-per-task=4 --mem=12G
 #
-# RESUMABLE BY CONSTRUCTION: synthetic_context_lib.run_scoring keys on
-# row_id and skips every row already present in the results CSV. A requeued,
-# resubmitted or previously-interrupted job continues where it stopped and
-# never re-spends a call. Partial results scored elsewhere can simply be
-# copied in beforehand and will be honoured the same way.
+# so that is what it requests. The cost is real: an L40S sits idle for the
+# duration (~3.2 h of GPU time for a 10,000-call chunk at ~0.55 s/call).
+#
+# If probe_slurm.sh shows a genuine CPU-only partition, override it --
+# command-line flags beat the #SBATCH directives above:
+#
+#     sbatch --partition=<cpu_part> --gres=NONE upstream_exon/slurm/score_b1.sbatch
+#
+# To keep that waste bounded, the job scores a CHUNK and exits; chain several
+# sequentially rather than holding one GPU for six hours.
+# ---------------------------------------------------------------------------
+#
+# RESUME: synthetic_context_lib.run_scoring keys on row_id and skips rows
+# already present in the results CSV, and the scorer only rebuilds the
+# constructs it still needs. The 1,800 labels already on disk are preserved
+# and will not be re-spent.
+#
+# CONCURRENCY: the scorer takes an exclusive lock on the results CSV and
+# refuses to start if another scorer holds it, so two jobs can never
+# interleave writes. submit_pipeline.sh chains chunks with afterok, which
+# also serializes them.
 #
 #     mkdir -p logs
 #     sbatch upstream_exon/slurm/score_b1.sbatch
+#     CHUNK=5000 sbatch upstream_exon/slurm/score_b1.sbatch
 #     MODE=replication sbatch upstream_exon/slurm/score_b1.sbatch
-#     DATASET=dataset_v1 sbatch upstream_exon/slurm/score_b1.sbatch
 
 set -euo pipefail
 
@@ -37,6 +56,7 @@ REPO=/scratch/yl12316/Opensplice-PNAS-data-analysis
 ENV=/scratch/yl12316/conda_envs/opensplicerna
 MODE=${MODE:-primary}
 DATASET=${DATASET:-dataset_v2}
+CHUNK=${CHUNK:-10000}
 
 cd "$REPO"
 mkdir -p logs
@@ -45,12 +65,13 @@ source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$ENV"
 
 if [[ ! -f .env.alphagenome ]]; then
-    echo "FATAL: .env.alphagenome not found in $REPO" >&2
-    echo "       Copy it from the local checkout (it is gitignored)." >&2
+    echo "FATAL: .env.alphagenome not found at $REPO" >&2
+    echo "       Copy it to the REPO ROOT (it is gitignored)." >&2
     exit 1
 fi
 
-echo "host=$(hostname)  job=${SLURM_JOB_ID:-none}  mode=${MODE}  dataset=${DATASET}"
+echo "host=$(hostname)  job=${SLURM_JOB_ID:-none}"
+echo "partition=${SLURM_JOB_PARTITION:-?}  mode=${MODE}  dataset=${DATASET}  chunk=${CHUNK}"
 
 RESULTS="outputs/upstream_exon/${DATASET}/b1_${MODE}_ag_results.csv"
 if [[ -f "$RESULTS" ]]; then
@@ -61,9 +82,9 @@ fi
 
 # Fail fast if the API is unreachable, rather than consuming the walltime.
 echo
-echo "--- connectivity preflight ---"
+echo "--- connectivity preflight (same node type as the scoring run) ---"
 python - <<'PY' || { echo "FATAL: AlphaGenome unreachable from this node." >&2; \
-                     echo "       Submit check_connectivity.sbatch for detail, or score" >&2; \
+                     echo "       Run check_connectivity.sbatch for detail, or score" >&2; \
                      echo "       locally and rsync the results CSV (see README)." >&2; exit 1; }
 import sys
 sys.path.insert(0, "analysis_script")
@@ -74,16 +95,18 @@ PY
 
 echo
 echo "--- planned call count ---"
-python upstream_exon/score_b1_dataset.py --mode "${MODE}" --dataset "${DATASET}" --dry-run
+python upstream_exon/score_b1_dataset.py \
+    --mode "${MODE}" --dataset "${DATASET}" \
+    --max-new-calls "${CHUNK}" --dry-run
 
 echo
 echo "--- scoring ---"
 srun python upstream_exon/score_b1_dataset.py \
     --mode "${MODE}" \
     --dataset "${DATASET}" \
+    --max-new-calls "${CHUNK}" \
     --flush-every 200 \
     "$@"
 
 echo
-echo "done: ${RESULTS}"
-echo "rows: $(( $(wc -l < "$RESULTS") - 1 ))"
+echo "rows now: $(( $(wc -l < "$RESULTS") - 1 ))"

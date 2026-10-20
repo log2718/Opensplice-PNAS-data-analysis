@@ -127,70 +127,71 @@ python upstream_exon/build_b1_dataset_v2.py --validate-only
 python upstream_exon/build_b1_dataset_v2.py
 ```
 
-### 2. Submit the whole pipeline on Torch (recommended)
+### 2. Determine valid SLURM resources FIRST
 
-Scoring and training both run on the cluster, chained so each stage starts
-only if the previous one succeeded:
+`cpu_public` does not exist on Torch — submission fails with
+`Error partition 'cpu_public' is not valid for this job`. Run the probe on a
+login node and send the output back so resources can be set from fact:
+
+```bash
+bash upstream_exon/slurm/probe_slurm.sh | tee slurm_probe.txt
+```
+
+It is read-only (it submits nothing; section 7 uses `sbatch --test-only`) and
+reports which partitions exist, which the account may use, whether any accepts
+a CPU-only job, and each partition's walltime cap.
+
+**Until that is known**, every script defaults to the one allocation confirmed
+to work on this account:
+
+```
+--partition=l40s_public --gres=gpu:l40s:1 --cpus-per-task=4 --mem=12G
+```
+
+**This means the scoring job holds an L40S it never uses** — it is pure
+network I/O to the AlphaGenome API. At ~0.55 s/call that is ~1.5 idle
+GPU-hours per 10,000-call chunk, ~5.8 GPU-hours for the remaining 38,200 —
+which is why scoring is chunked rather than held as one long reservation. If the probe reveals a CPU-only partition, override it:
+
+```bash
+PARTITION=<cpu_part> GRES=NONE bash upstream_exon/slurm/submit_pipeline.sh --go
+```
+
+### 3. Submit the pipeline
 
 ```bash
 cd /scratch/yl12316/Opensplice-PNAS-data-analysis
-bash upstream_exon/slurm/submit_pipeline.sh
+bash upstream_exon/slurm/submit_pipeline.sh          # dry run, prints the plan
+bash upstream_exon/slurm/submit_pipeline.sh --go     # submit
 ```
 
-That submits, in order:
+| stage | script | resources |
+|---|---|---|
+| connectivity check | `check_connectivity.sbatch` | l40s_public, 4 CPU, 12G, 15 min |
+| scoring × 4 chunks | `score_b1.sbatch` | l40s_public, 4 CPU, 12G, 4 h each |
+| GPU training | `train_full.sbatch` | l40s_public, 4 CPU, 24G, 4 h |
 
-| stage | script | partition | notes |
-|---|---|---|---|
-| connectivity check | `check_connectivity.sbatch` | `cpu_public` | ≤ 1 API call |
-| AlphaGenome scoring | `score_b1.sbatch` | `cpu_public` | 40,000 calls, no GPU |
-| GPU training | `train_full.sbatch` | `l40s_public` | `--gres=gpu:l40s:1` |
+With 1,800 of 40,000 already labeled, the plan is **4 scoring chunks of
+10,000**, chained `afterok` so they run strictly one at a time — never
+concurrently against the same results CSV. The scorer also takes an exclusive
+lock on the results file as a second guard.
+
+A failed `sbatch` aborts immediately and schedules nothing downstream
+(verified). If a running stage fails, downstream jobs sit in
+`DependencyNeverSatisfied`:
+
+```bash
+squeue -u $USER --format='%.10i %.12P %.14j %.8T %.10M %R'
+scancel -u $USER --state=PENDING      # clear a stalled chain
+```
 
 Variants:
 
 ```bash
-bash upstream_exon/slurm/submit_pipeline.sh --score-only
-bash upstream_exon/slurm/submit_pipeline.sh --train-only
-bash upstream_exon/slurm/submit_pipeline.sh --no-check
+bash upstream_exon/slurm/submit_pipeline.sh --go --score-only
+bash upstream_exon/slurm/submit_pipeline.sh --go --train-only
+CHUNK=5000 bash upstream_exon/slurm/submit_pipeline.sh --go
 ```
-
-Or submit stages individually:
-
-```bash
-mkdir -p logs
-sbatch upstream_exon/slurm/check_connectivity.sbatch && cat logs/b1_netcheck_*.out
-sbatch upstream_exon/slurm/score_b1.sbatch
-sbatch upstream_exon/slurm/train_full.sbatch
-
-squeue -u $USER
-tail -f logs/b1_full_<jobid>.out
-sacct -j <jobid> --format=JobID,State,Elapsed,MaxRSS,ReqTRES
-```
-
-`score_b1.sbatch` runs a connectivity preflight itself and **fails fast** if
-the API is unreachable, rather than burning its walltime.
-`train_full.sbatch` **refuses to start** unless the results CSV has all 40,000
-rows, so it cannot silently train on a partial dataset (override with
-`EXPECTED_ROWS=<n>`).
-
-### 3. Seeding the cluster with already-scored labels (optional)
-
-1,800 rows were scored locally before the job moved to HPC. Copying them up
-means the cluster resumes from 1,800 instead of 0 — `run_scoring` keys on
-`row_id` and skips anything already present:
-
-```bash
-rsync -avP \
-  outputs/upstream_exon/dataset_v2/b1_primary_ag_results.csv \
-  outputs/upstream_exon/dataset_v2/b1_primary_manifest.csv \
-  outputs/upstream_exon/dataset_v2/b1_primary_manifest_meta.json \
-  .env.alphagenome \
-  torch:/scratch/yl12316/Opensplice-PNAS-data-analysis/outputs/upstream_exon/dataset_v2/
-```
-
-(Move `.env.alphagenome` to the repo root on the cluster, not the dataset
-directory — `score_b1.sbatch` expects it there and refuses to start without it.)
-
-Use `dtn.torch.hpc.nyu.edu` rather than `torch` for large transfers.
 
 ### 4. Fallback: score locally, then transfer
 
@@ -198,7 +199,7 @@ Only if the connectivity check fails:
 
 ```bash
 python upstream_exon/score_b1_dataset.py --dataset dataset_v2 --flush-every 200
-# ~0.5 s/call, so ~5.3 h for the remaining 38,200 — resumable, safe to re-run
+# ~0.55 s/call => ~5.8 h for the remaining 38,200; resumable, safe to re-run
 
 rsync -avP outputs/upstream_exon/dataset_v2/b1_primary_ag_results.csv \
   torch:/scratch/yl12316/Opensplice-PNAS-data-analysis/outputs/upstream_exon/dataset_v2/
@@ -206,8 +207,11 @@ rsync -avP outputs/upstream_exon/dataset_v2/b1_primary_ag_results.csv \
 ssh torch "wc -l /scratch/yl12316/Opensplice-PNAS-data-analysis/outputs/upstream_exon/dataset_v2/b1_primary_ag_results.csv"
 # expect 40001 (40,000 rows + header)
 
-bash upstream_exon/slurm/submit_pipeline.sh --train-only
+bash upstream_exon/slurm/submit_pipeline.sh --go --train-only
 ```
+
+`.env.alphagenome` must sit at the **repo root** on the cluster, not in the
+dataset directory.
 
 ### 5. Tests
 
