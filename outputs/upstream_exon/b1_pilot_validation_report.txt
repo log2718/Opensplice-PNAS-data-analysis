@@ -1,0 +1,4 @@
+B1 pilot manifest validation
+========================================================================
+rows=273 distinct_constructs=266 variants=38 exons=7
+ALL CHECKS PASSED

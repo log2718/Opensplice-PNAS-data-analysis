@@ -1,0 +1,12 @@
+/opt/anaconda3/lib/python3.13/site-packages/pandas/core/computation/expressions.py:23: UserWarning: Pandas requires version '2.10.2' or newer of 'numexpr' (version '2.10.1' currently installed).
+  from pandas.core.computation.check import NUMEXPR_INSTALLED
+[verify] 40000 constructs rebuilt and SHA-256 verified
+[plan]   middle exon syn_a5.0_00482, alpha mix {0.5: 8000, 1.0: 16000, 2.0: 16000}
+[plan]   0 rows already scored; this invocation covers 40000 manifest rows
+[plan]   MAXIMUM NEW ALPHAGENOME CALLS: 40000
+[scoring] 40000 of 40000 rows to call
+  [200/40000] syn_a5.0_00482|g_a0.5_00049_r3 | 0.59s/call | elapsed 2.0m | ETA 388.5m | 200 rows
+  [400/40000] syn_a5.0_00482|g_a0.5_00099_r3 | 0.66s/call | elapsed 4.4m | ETA 433.0m | 400 rows
+  [600/40000] syn_a5.0_00482|g_a0.5_00149_r3 | 0.60s/call | elapsed 6.0m | ETA 391.6m | 600 rows
+  [800/40000] syn_a5.0_00482|g_a0.5_00199_r3 | 0.61s/call | elapsed 8.1m | ETA 395.5m | 800 rows
+  [1000/40000] syn_a5.0_00482|g_a0.5_00249_r3 | 0.54s/call | elapsed 9.1m | ETA 353.4m | 1000 rows

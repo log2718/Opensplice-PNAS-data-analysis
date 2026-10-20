@@ -1,0 +1,45 @@
+{
+  "requested": 10000,
+  "per_alpha_requested": {
+    "0.5": 2000,
+    "1.0": 4000,
+    "2.0": 4000
+  },
+  "duplicate_redraws": 1,
+  "excluded_collisions": 0,
+  "seed": 20261020,
+  "length": 113,
+  "per_alpha_made_0.5": 2000,
+  "per_alpha_made_1.0": 4000,
+  "per_alpha_made_2.0": 4000,
+  "produced": 10000,
+  "unique": 10000,
+  "exon": "syn_a5.0_00482",
+  "mode": "primary",
+  "exon_detail": {
+    "sequence_id": "syn_a5.0_00482",
+    "alpha_exon": 5.0,
+    "synthetic_70mer": "ATCACGCCTCTTACTGAGACGCCGAATGCCACCTGTCTACGCCCGTCCAGAAGCCCGACGTCGCCAACTT",
+    "full_middle_exon": "GTTATCACGCCTCTTACTGAGACGCCGAATGCCACCTGTCTACGCCCGTCCAGAAGCCCGACGTCGCCAACTTCAG",
+    "PNAS_common": 10.251559257507324
+  },
+  "alpha_mix": {
+    "0.5": 0.2,
+    "1.0": 0.4,
+    "2.0": 0.4
+  },
+  "split_fractions": {
+    "train": 0.8,
+    "val": 0.1,
+    "test": 0.1
+  },
+  "split_seed": 720261020,
+  "b1_len": 113,
+  "n_rows": 10000,
+  "qc_flag_counts": {
+    "flag_long_homopolymer": 1835,
+    "flag_extreme_base_frac": 2502,
+    "flag_low_complexity": 3536,
+    "flag_extreme_gc": 1963
+  }
+}

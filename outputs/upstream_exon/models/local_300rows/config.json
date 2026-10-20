@@ -1,0 +1,51 @@
+{
+  "results_csv": "/Users/liyanle/Desktop/Bioinformatics and Molecular Biology/Opensplice-analysis/outputs/upstream_exon/dataset_v1/b1_primary_ag_results.csv",
+  "manifest_csv": "/Users/liyanle/Desktop/Bioinformatics and Molecular Biology/Opensplice-analysis/outputs/upstream_exon/dataset_v1/b1_primary_manifest.csv",
+  "use_structure": false,
+  "rnafold_bin": "RNAfold",
+  "input_length": 113,
+  "num_seq_filters": 20,
+  "head": "linear",
+  "batchnorm": false,
+  "epochs": 400,
+  "batch_size": 64,
+  "lr": 0.001,
+  "weight_decay": 0.0,
+  "l1_lambda": 0.0,
+  "l2_smooth": 0.001,
+  "loss": "mse",
+  "huber_delta": 1.0,
+  "patience": 50,
+  "no_standardize_target": false,
+  "run_name": "local_300rows",
+  "out_dir": "/Users/liyanle/Desktop/Bioinformatics and Molecular Biology/Opensplice-analysis/outputs/upstream_exon/models",
+  "device": "cpu",
+  "seed": 42,
+  "num_workers": 0,
+  "resume": false,
+  "skip_baselines": false,
+  "kmer_k": 6,
+  "smoke": false,
+  "model": {
+    "input_length": 113,
+    "conv_out_length": 108,
+    "use_structure": false,
+    "head": "linear",
+    "num_seq_filters": 20,
+    "num_struct_filters": 0,
+    "n_params": 5324,
+    "n_trainable": 5324
+  },
+  "target_standardizer": {
+    "mu": 3.799377731362936,
+    "sd": 0.6975478587039571,
+    "active": true
+  },
+  "n_rows": 300,
+  "splits": {
+    "train": 247,
+    "test": 33,
+    "val": 20
+  },
+  "structure_note": "sequence-only"
+}

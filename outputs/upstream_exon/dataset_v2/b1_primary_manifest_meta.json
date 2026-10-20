@@ -1,0 +1,49 @@
+{
+  "requested_sequences": 40000,
+  "replicates_per_group": 4,
+  "per_alpha_groups": {
+    "0.5": 2000,
+    "1.0": 4000,
+    "2.0": 4000
+  },
+  "duplicate_redraws": 8,
+  "excluded_collisions": 13,
+  "seed": 20261021,
+  "length": 113,
+  "design": "grouped",
+  "produced": 40000,
+  "unique": 40000,
+  "groups": 10000,
+  "exon": "syn_a5.0_00482",
+  "excluded_prior_sequences": 10038,
+  "exon_detail": {
+    "sequence_id": "syn_a5.0_00482",
+    "alpha_exon": 5.0,
+    "synthetic_70mer": "ATCACGCCTCTTACTGAGACGCCGAATGCCACCTGTCTACGCCCGTCCAGAAGCCCGACGTCGCCAACTT",
+    "full_middle_exon": "GTTATCACGCCTCTTACTGAGACGCCGAATGCCACCTGTCTACGCCCGTCCAGAAGCCCGACGTCGCCAACTTCAG",
+    "PNAS_common": 10.251559257507324
+  },
+  "alpha_mix": {
+    "0.5": 0.2,
+    "1.0": 0.4,
+    "2.0": 0.4
+  },
+  "split_sequences": {
+    "train": 27000,
+    "val": 3000,
+    "test": 10000
+  },
+  "split_groups": {
+    "test": 2500,
+    "train": 6750,
+    "val": 750
+  },
+  "split_seed": 20261021,
+  "b1_len": 113,
+  "qc_flag_counts": {
+    "flag_long_homopolymer": 7298,
+    "flag_extreme_base_frac": 10069,
+    "flag_low_complexity": 14295,
+    "flag_extreme_gc": 8092
+  }
+}

@@ -1,0 +1,76 @@
+==========================================================================
+B1 CRYPTIC SPLICE SITE CHECK
+==========================================================================
+constructs re-scored with full tracks: 43
+  syn_a5.0_00482 (primary): 37
+  syn_a0.5_00475: 3
+  syn_a1.0_00359: 3
+exclusion half-width around annotated sites: 3 nt
+
+re-score vs pilot AG_mean_logit: max |diff| = 0.00e+00  (exact for 43/43)
+
+--------------------------------------------------------------------------
+1. ANNOTATED SPLICE SITES (sanity: all four should stay strong)
+--------------------------------------------------------------------------
+  upstream_donor         pos   115   prob min 0.3965  median 0.7266  max 0.9570
+  middle_acceptor        pos   243   prob min 0.5117  median 0.9688  max 0.9844
+  middle_donor           pos   318   prob min 0.6562  median 0.9648  max 0.9844
+  downstream_acceptor    pos  1168   prob min 0.4414  median 0.8750  max 0.9453
+
+--------------------------------------------------------------------------
+2. MIDDLE-EXON PEAK DRIFT (argmax within +/-5 nt of the read position)
+--------------------------------------------------------------------------
+  acceptor: nonzero drift in 0/43 constructs; drift values [0]
+            local max exceeds the read position by at most 0.00e+00
+  donor: nonzero drift in 0/43 constructs; drift values [0]
+            local max exceeds the read position by at most 0.00e+00
+  middle acceptor is the construct's global acceptor argmax in 43/43
+  middle donor    is the construct's global donor argmax in 39/43
+
+--------------------------------------------------------------------------
+3. OFF-TARGET PEAKS (annotated sites excluded)
+--------------------------------------------------------------------------
+  strongest off-target peak anywhere, over all 43 constructs:
+      min 0.0903   median 0.2021   max 0.6875
+  NATIVE B1 constructs (n=3) off-target max: 0.3047, 0.2490, 0.2295
+  inside the randomized B1 region:  median 0.0986  max 0.6875
+  outside B1 (rest of the construct): median 0.1826  max 0.3125
+  with only the 4 exact positions excluded: max 0.6875
+
+  constructs with ANY off-target position above a threshold:
+      > 0.1:  42/43 constructs (20 of them with the peak inside B1); max positions in one construct = 5
+      > 0.3:   9/43 constructs (8 of them with the peak inside B1); max positions in one construct = 1
+      > 0.5:   4/43 constructs (4 of them with the peak inside B1); max positions in one construct = 1
+
+  single strongest off-target peak in the whole experiment: 0.6875
+      syn_a5.0_00482|dinuc_06|r1  (vs its annotated sites at 0.949 / 0.941)
+
+--------------------------------------------------------------------------
+4. DOES OFF-TARGET PEAK STRENGTH EXPLAIN THE B1 EFFECT?
+--------------------------------------------------------------------------
+  primary exon syn_a5.0_00482, n=37 (native + 36 fixed-length variants)
+  delta_vs_native range -0.638 .. +1.254
+
+  strongest off-target peak anywhere     vs delta     Spearman rho=+0.162 p=0.339   Pearson r=+0.139 p=0.412
+  strongest off-target peak anywhere     vs |delta|   Spearman rho=+0.072 p=0.673   Pearson r=+0.099 p=0.561
+  strongest peak inside B1               vs delta     Spearman rho=+0.049 p=0.772   Pearson r=+0.041 p=0.809
+  strongest peak inside B1               vs |delta|   Spearman rho=+0.054 p=0.752   Pearson r=+0.049 p=0.773
+  strongest donor peak inside B1         vs delta     Spearman rho=+0.140 p=0.408   Pearson r=+0.097 p=0.570
+  strongest donor peak inside B1         vs |delta|   Spearman rho=+0.022 p=0.899   Pearson r=+0.017 p=0.922
+  strongest acceptor peak inside B1      vs delta     Spearman rho=-0.253 p=0.132   Pearson r=-0.203 p=0.229
+  strongest acceptor peak inside B1      vs |delta|   Spearman rho=-0.141 p=0.404   Pearson r=-0.048 p=0.776
+
+  HEADLINE: Spearman(strongest off-target peak, delta_vs_native) = +0.1617, p = 0.3390, n = 37
+            linear fit r^2 = 0.0193 (slope +0.465 logit per unit peak probability, p = 0.412)
+
+--------------------------------------------------------------------------
+5. CROSS-EXON SPOT CHECK (native + most extreme up/down variant)
+--------------------------------------------------------------------------
+  exon             b1_id               delta   offtgt    in_B1  drift_a  drift_d
+  syn_a0.5_00475   uniform_03         -0.674   0.1152   0.0505        0        0
+  syn_a0.5_00475   native_PNAS        +0.000   0.2490   0.2490        0        0
+  syn_a0.5_00475   uniform_13         +1.111   0.1689   0.0645        0        0
+  syn_a1.0_00359   uniform_15         -1.771   0.0903   0.0105        0        0
+  syn_a1.0_00359   native_PNAS        +0.000   0.2295   0.2295        0        0
+  syn_a1.0_00359   compmatched_02     +0.119   0.2520   0.0933        0        0
+

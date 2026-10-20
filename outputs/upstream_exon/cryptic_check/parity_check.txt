@@ -1,0 +1,10 @@
+parity check on syn_a5.0_00482|native_PNAS|r1
+
+  AG_acceptor_probability      score_core=0.94921875               fulltrack=0.94921875               EQUAL
+  AG_donor_probability         score_core=0.9453125                fulltrack=0.9453125                EQUAL
+  AG_mean_prob                 score_core=0.947265625              fulltrack=0.947265625              EQUAL
+  AG_mean_logit                score_core=2.88899624121022         fulltrack=2.88899624121022         EQUAL
+  AG_prod_logit                score_core=2.1676687468584612       fulltrack=2.1676687468584612       EQUAL
+  core_length                  score_core=1309                     fulltrack=1309                     EQUAL
+
+RESULT: PASS -- every shared scalar identical

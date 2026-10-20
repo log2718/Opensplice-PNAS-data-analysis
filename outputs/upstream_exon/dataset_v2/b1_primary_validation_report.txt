@@ -1,0 +1,43 @@
+v2 grouped B1 library validation
+========================================================================
+  [PASS] 1a. 40,000 sequences  --  n=40000
+  [PASS] 1b. 10,000 groups  --  10000
+  [PASS] 1c. every group has exactly 4 sequences  --  sizes [4]
+  [PASS] 1d. replicate ids are 0..3 within every group
+  [PASS] 2a. groups per alpha are 2,000 / 4,000 / 4,000  --  {0.5: 2000, 1.0: 4000, 2.0: 4000}
+  [PASS] 2b. sequences per alpha are 8,000 / 16,000 / 16,000  --  {0.5: 8000, 1.0: 16000, 2.0: 16000}
+  [PASS] 2c. realized mixture is 20/40/40  --  {0.5: 0.2, 1.0: 0.4, 2.0: 0.4}
+  [PASS] 3a. all four replicates share one probability vector
+  [PASS] 3b. every probability vector sums to 1  --  max dev 4.44e-16
+  [PASS] 3c. within-group GC spread is much smaller than between-group  --  within 0.0384 vs between 0.2205
+  [PASS] 4a. every B1 is exactly 113 nt
+  [PASS] 4b. alphabet is ACGT only
+  [PASS] 4c. all 40,000 sequences unique  --  40000
+  [PASS] 4d. digests match the sequences
+  [PASS] 5a. no overlap with the pilot panel or the v1 library  --  10038 prior sequences checked
+  [PASS] 5b. the v1 manifest still exists and is untouched
+  [PASS] 5c. the 300 previously labeled v1 examples are preserved  --  300 rows in dataset_v1/b1_primary_ag_results.csv
+  [PASS] 6a. split sizes are 27,000 / 3,000 / 10,000  --  {'train': 27000, 'test': 10000, 'val': 3000}
+  [PASS] 6b. group counts are 6,750 / 750 / 2,500  --  {'test': 2500, 'train': 6750, 'val': 750}
+  [PASS] 6c. no group is split across two sets  --  max distinct splits per group 1
+  [PASS] 6d. every split keeps the 20/40/40 alpha mixture  --  
+alpha  0.5  1.0  2.0
+split               
+test   0.2  0.4  0.4
+train  0.2  0.4  0.4
+val    0.2  0.4  0.4
+  [PASS] 6e. no sequence appears in two splits
+  [PASS] 7a. 500 sampled constructs pass every structural assertion  --  0 bad
+  [PASS] 7b. all constructs are 1,309 nt
+  [PASS] 7c. exon_start is constant  --  [243]
+  [PASS] 7d. middle exon is the primary one  --  syn_a5.0_00482
+  [PASS] 7e. B2-B8 present and non-empty
+  [PASS] 8a. regenerating reproduces the same sequences
+  [PASS] 9. gc recorded for every row
+  [PASS] 9. max_homopolymer recorded for every row
+  [PASS] 9. distinct_3mers recorded for every row
+  [PASS] 9. entropy_bits recorded for every row
+  [PASS] 9. max_base_frac recorded for every row
+  [PASS] 9. target_pA recorded for every row
+  [PASS] 9. seed recorded for every row
+ALL CHECKS PASSED
