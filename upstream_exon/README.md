@@ -127,63 +127,87 @@ python upstream_exon/build_b1_dataset_v2.py --validate-only
 python upstream_exon/build_b1_dataset_v2.py
 ```
 
-### 2. Can Torch compute nodes reach AlphaGenome?
+### 2. Submit the whole pipeline on Torch (recommended)
+
+Scoring and training both run on the cluster, chained so each stage starts
+only if the previous one succeeded:
 
 ```bash
-cd /scratch/yl12316/Opensplice-PNAS-data-analysis && mkdir -p logs
-sbatch upstream_exon/slurm/check_connectivity.sbatch
-cat logs/b1_netcheck_*.out
+cd /scratch/yl12316/Opensplice-PNAS-data-analysis
+bash upstream_exon/slurm/submit_pipeline.sh
 ```
 
-Spends at most one AlphaGenome call. The last line says which path to take.
+That submits, in order:
 
-### 3a. Score ON the cluster (only if step 2 succeeded)
+| stage | script | partition | notes |
+|---|---|---|---|
+| connectivity check | `check_connectivity.sbatch` | `cpu_public` | ≤ 1 API call |
+| AlphaGenome scoring | `score_b1.sbatch` | `cpu_public` | 40,000 calls, no GPU |
+| GPU training | `train_full.sbatch` | `l40s_public` | `--gres=gpu:l40s:1` |
+
+Variants:
 
 ```bash
+bash upstream_exon/slurm/submit_pipeline.sh --score-only
+bash upstream_exon/slurm/submit_pipeline.sh --train-only
+bash upstream_exon/slurm/submit_pipeline.sh --no-check
+```
+
+Or submit stages individually:
+
+```bash
+mkdir -p logs
+sbatch upstream_exon/slurm/check_connectivity.sbatch && cat logs/b1_netcheck_*.out
 sbatch upstream_exon/slurm/score_b1.sbatch
-squeue -u $USER
-tail -f logs/b1_score_<jobid>.out
-```
-
-### 3b. Score LOCALLY, then transfer (if step 2 failed)
-
-```bash
-# on the laptop, from the repo root — resumable, safe to re-run
-python upstream_exon/score_b1_dataset.py --dataset dataset_v2 --flush-every 200
-
-# transfer just the labeled dataset (~40k rows)
-rsync -avP \
-  "outputs/upstream_exon/dataset_v2/b1_primary_ag_results.csv" \
-  "outputs/upstream_exon/dataset_v2/b1_primary_manifest.csv" \
-  "outputs/upstream_exon/dataset_v2/b1_primary_manifest_meta.json" \
-  torch:/scratch/yl12316/Opensplice-PNAS-data-analysis/outputs/upstream_exon/dataset_v2/
-
-# verify row count on the cluster
-ssh torch "wc -l /scratch/yl12316/Opensplice-PNAS-data-analysis/outputs/upstream_exon/dataset_v2/b1_primary_ag_results.csv"
-# expect 40001 (40,000 rows + header)
-```
-
-Use `dtn.torch.hpc.nyu.edu` instead of `torch` for large transfers if the data
-transfer node is preferred.
-
-### 4. The full training run
-
-```bash
-cd /scratch/yl12316/Opensplice-PNAS-data-analysis && mkdir -p logs
-
-sbatch upstream_exon/slurm/smoke_gpu.sbatch     # optional, ~2 min, verifies GPU+env
-sbatch upstream_exon/slurm/train_full.sbatch    # THE run
+sbatch upstream_exon/slurm/train_full.sbatch
 
 squeue -u $USER
 tail -f logs/b1_full_<jobid>.out
 sacct -j <jobid> --format=JobID,State,Elapsed,MaxRSS,ReqTRES
-
-sbatch upstream_exon/slurm/train_full.sbatch --resume   # after preemption
 ```
 
-`train_full.sbatch` refuses to start unless the results CSV has all 40,000
-rows, so it cannot silently train on a partial dataset. Override with
-`EXPECTED_ROWS=<n>` if you deliberately want a subset.
+`score_b1.sbatch` runs a connectivity preflight itself and **fails fast** if
+the API is unreachable, rather than burning its walltime.
+`train_full.sbatch` **refuses to start** unless the results CSV has all 40,000
+rows, so it cannot silently train on a partial dataset (override with
+`EXPECTED_ROWS=<n>`).
+
+### 3. Seeding the cluster with already-scored labels (optional)
+
+1,800 rows were scored locally before the job moved to HPC. Copying them up
+means the cluster resumes from 1,800 instead of 0 — `run_scoring` keys on
+`row_id` and skips anything already present:
+
+```bash
+rsync -avP \
+  outputs/upstream_exon/dataset_v2/b1_primary_ag_results.csv \
+  outputs/upstream_exon/dataset_v2/b1_primary_manifest.csv \
+  outputs/upstream_exon/dataset_v2/b1_primary_manifest_meta.json \
+  .env.alphagenome \
+  torch:/scratch/yl12316/Opensplice-PNAS-data-analysis/outputs/upstream_exon/dataset_v2/
+```
+
+(Move `.env.alphagenome` to the repo root on the cluster, not the dataset
+directory — `score_b1.sbatch` expects it there and refuses to start without it.)
+
+Use `dtn.torch.hpc.nyu.edu` rather than `torch` for large transfers.
+
+### 4. Fallback: score locally, then transfer
+
+Only if the connectivity check fails:
+
+```bash
+python upstream_exon/score_b1_dataset.py --dataset dataset_v2 --flush-every 200
+# ~0.5 s/call, so ~5.3 h for the remaining 38,200 — resumable, safe to re-run
+
+rsync -avP outputs/upstream_exon/dataset_v2/b1_primary_ag_results.csv \
+  torch:/scratch/yl12316/Opensplice-PNAS-data-analysis/outputs/upstream_exon/dataset_v2/
+
+ssh torch "wc -l /scratch/yl12316/Opensplice-PNAS-data-analysis/outputs/upstream_exon/dataset_v2/b1_primary_ag_results.csv"
+# expect 40001 (40,000 rows + header)
+
+bash upstream_exon/slurm/submit_pipeline.sh --train-only
+```
 
 ### 5. Tests
 
@@ -221,8 +245,16 @@ re-reads the CSV and continues. Re-running never re-spends a call.
 3. **Cryptic splice sites** were cleared on a 43-construct pilot subset
    (`B1_CRYPTIC_CHECK.md`, Spearman +0.162, p = 0.339). The v2 library is more
    compositionally extreme, so that screen is worth repeating on a sample.
-4. **Partition names are unverified.** Torch SSH offered only password auth
-   from here, so `l40s_public` / `cpu_public` could not be checked. Run
-   `sinfo -s` before submitting.
+4. **Partition and GPU names are unverified from here.** Torch SSH offered
+   only password auth, so `l40s_public` / `cpu_public` could not be checked.
+   Run `sinfo -s` before submitting. GPU scripts request the explicit
+   `--gres=gpu:l40s:1`; if that form is rejected, change it to `--gres=gpu:1`.
+
+6. **`--requeue` does not resume on its own.** It only re-runs the script.
+   `train_full.sbatch` therefore detects `models/<run>/last.pt` itself and
+   adds `--resume`, so a requeued job continues rather than silently
+   restarting at epoch 1. Verified end to end: a 12-epoch run resumed at
+   epoch 13 with optimizer state and best-val preserved, producing a
+   contiguous 1..20 history. Force a clean start with `FRESH=1`.
 5. **Structure arm folds B1 in isolation** (`--use-structure`), which is not
    how it folds inside the 1,309-nt transcript. Recorded in `config.json`.

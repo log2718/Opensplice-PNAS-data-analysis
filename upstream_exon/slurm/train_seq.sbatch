@@ -2,7 +2,7 @@
 #SBATCH --job-name=b1_seq
 #SBATCH --account=torch_pr_352_general
 #SBATCH --partition=l40s_public
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:l40s:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=04:00:00

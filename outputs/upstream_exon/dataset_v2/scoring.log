@@ -10,3 +10,7 @@
   [600/40000] syn_a5.0_00482|g_a0.5_00149_r3 | 0.60s/call | elapsed 6.0m | ETA 391.6m | 600 rows
   [800/40000] syn_a5.0_00482|g_a0.5_00199_r3 | 0.61s/call | elapsed 8.1m | ETA 395.5m | 800 rows
   [1000/40000] syn_a5.0_00482|g_a0.5_00249_r3 | 0.54s/call | elapsed 9.1m | ETA 353.4m | 1000 rows
+  [1200/40000] syn_a5.0_00482|g_a0.5_00299_r3 | 0.52s/call | elapsed 10.4m | ETA 336.6m | 1200 rows
+  [1400/40000] syn_a5.0_00482|g_a0.5_00349_r3 | 0.50s/call | elapsed 11.8m | ETA 324.6m | 1400 rows
+  [1600/40000] syn_a5.0_00482|g_a0.5_00399_r3 | 0.49s/call | elapsed 13.2m | ETA 315.8m | 1600 rows
+  [1800/40000] syn_a5.0_00482|g_a0.5_00449_r3 | 0.52s/call | elapsed 15.5m | ETA 328.9m | 1800 rows
