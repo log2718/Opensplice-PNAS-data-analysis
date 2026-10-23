@@ -31,13 +31,19 @@
 set -uo pipefail
 
 REPO=/scratch/yl12316/Opensplice-PNAS-data-analysis
-ENV=/scratch/yl12316/conda_envs/opensplicerna
 
 cd "$REPO" || exit 1
 mkdir -p logs
 
-source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate "$ENV"
+# Use the environment's interpreter directly. `conda activate` is not
+# available on compute nodes here (no conda on PATH, no profile.d hook), so
+# activation silently failed and the job fell back to a system python without
+# pandas. The interpreter path works without any activation.
+PYTHON_BIN=${PYTHON_BIN:-/scratch/yl12316/conda_envs/opensplicerna/bin/python}
+if [[ ! -x "$PYTHON_BIN" ]]; then
+    echo "FATAL: interpreter not found: $PYTHON_BIN" >&2
+    exit 1
+fi
 
 echo "host=$(hostname)  job=${SLURM_JOB_ID:-none}"
 echo "partition=${SLURM_JOB_PARTITION:-?}  gres=${SLURM_JOB_GRES:-none}"
@@ -65,7 +71,7 @@ fi
 echo
 
 echo "--- 5. one real AlphaGenome call ---"
-python - <<'PY'
+"$PYTHON_BIN" - <<'PY'
 import sys
 sys.path.insert(0, "analysis_script")
 sys.path.insert(0, "upstream_exon")

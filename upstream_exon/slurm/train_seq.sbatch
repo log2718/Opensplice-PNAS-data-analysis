@@ -21,20 +21,26 @@
 set -euo pipefail
 
 REPO=/scratch/yl12316/Opensplice-PNAS-data-analysis
-ENV=/scratch/yl12316/conda_envs/opensplicerna
 RUN_NAME=${RUN_NAME:-seq_v1}
 
 cd "$REPO"
 mkdir -p logs
 
-source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate "$ENV"
+# Use the environment's interpreter directly. `conda activate` is not
+# available on compute nodes here (no conda on PATH, no profile.d hook), so
+# activation silently failed and the job fell back to a system python without
+# pandas. The interpreter path works without any activation.
+PYTHON_BIN=${PYTHON_BIN:-/scratch/yl12316/conda_envs/opensplicerna/bin/python}
+if [[ ! -x "$PYTHON_BIN" ]]; then
+    echo "FATAL: interpreter not found: $PYTHON_BIN" >&2
+    exit 1
+fi
 
 echo "host=$(hostname)  job=${SLURM_JOB_ID:-none}  run=${RUN_NAME}"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
-python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
+"$PYTHON_BIN" -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
 
-srun python upstream_exon/train_upstream.py \
+srun "$PYTHON_BIN" upstream_exon/train_upstream.py \
     --run-name "${RUN_NAME}" \
     --epochs 400 \
     --batch-size 128 \

@@ -48,7 +48,6 @@
 set -euo pipefail
 
 REPO=/scratch/yl12316/Opensplice-PNAS-data-analysis
-ENV=/scratch/yl12316/conda_envs/opensplicerna
 RUN_NAME=${RUN_NAME:-full_v2}
 EXPECTED_ROWS=${EXPECTED_ROWS:-40000}
 FRESH=${FRESH:-0}
@@ -56,8 +55,15 @@ FRESH=${FRESH:-0}
 cd "$REPO"
 mkdir -p logs
 
-source "$(conda info --base)/etc/profile.d/conda.sh"
-conda activate "$ENV"
+# Use the environment's interpreter directly. `conda activate` is not
+# available on compute nodes here (no conda on PATH, no profile.d hook), so
+# activation silently failed and the job fell back to a system python without
+# pandas. The interpreter path works without any activation.
+PYTHON_BIN=${PYTHON_BIN:-/scratch/yl12316/conda_envs/opensplicerna/bin/python}
+if [[ ! -x "$PYTHON_BIN" ]]; then
+    echo "FATAL: interpreter not found: $PYTHON_BIN" >&2
+    exit 1
+fi
 
 DSDIR=outputs/upstream_exon/dataset_v2
 RESULTS=$DSDIR/b1_primary_ag_results.csv
@@ -80,7 +86,7 @@ fi
 
 echo "host=$(hostname)  job=${SLURM_JOB_ID:-none}  run=${RUN_NAME}"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
-python -c "import torch; print('torch', torch.__version__, '| cuda', torch.cuda.is_available())"
+"$PYTHON_BIN" -c "import torch; print('torch', torch.__version__, '| cuda', torch.cuda.is_available())"
 
 # --- make --requeue actually resume -------------------------------------
 RESUME_ARG=()
@@ -96,11 +102,11 @@ fi
 
 echo
 echo "=== unit tests ==="
-python -m pytest upstream_exon/tests/test_upstream.py -q
+"$PYTHON_BIN" -m pytest upstream_exon/tests/test_upstream.py -q
 
 echo
 echo "=== training ==="
-srun python upstream_exon/train_upstream.py \
+srun "$PYTHON_BIN" upstream_exon/train_upstream.py \
     --run-name "${RUN_NAME}" \
     --results-csv "$RESULTS" \
     --manifest-csv "$MANIFEST" \
