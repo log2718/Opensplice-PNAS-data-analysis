@@ -22,3 +22,12 @@ open_splice_experimental_master_unique_sequence_all_predictor_cols.tsv
 
 #alphagenome model
 /alphagenome
+
+#python bytecode
+__pycache__/
+*.pyc
+
+#512 per-context chimera panels (27 MB, regenerable in ~3 min with
+#analysis_script/make_chimera8_context_plots.py). The index CSV beside them
+#is NOT ignored -- label_saturation.py needs it.
+outputs/synthetic_context_8block/plots/contexts/*/*.png
