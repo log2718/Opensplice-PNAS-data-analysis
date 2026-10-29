@@ -3,9 +3,9 @@
 #SBATCH --account=torch_pr_352_general
 #SBATCH --partition=l40s_public
 #SBATCH --gres=gpu:l40s:1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=24G
-#SBATCH --time=04:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=12:00:00
 #SBATCH --requeue
 #SBATCH --open-mode=append
 #SBATCH --output=logs/b1_full_%j.out
@@ -20,12 +20,35 @@
 # Model  : conv(4->20,k=6) x2 + learned position bias -> Softplus -> SumDiff
 #          -> Linear(1,1).  5,324 parameters, trained from scratch.
 #
-# RESOURCES track the allocation confirmed to work on this account:
-#   --partition=l40s_public --gres=gpu:l40s:1 --cpus-per-task=4
-# Memory is raised to 24G (above the known-good 12G) because the k-mer
-# baseline builds a 27,000 x 4,096 design matrix. If that is rejected, drop
-# it -- the CNN itself needs well under 2G:
-#   sbatch --mem=12G upstream_exon/slurm/train_full.sbatch --skip-baselines
+# ---------------------------------------------------------------------------
+# CPU-ONLY TRAINING
+# ---------------------------------------------------------------------------
+# The environment has a CPU-only PyTorch build (torch 2.14.0+cpu, cuda False),
+# which is fine: the model is 5,324 parameters and trains comfortably on CPU.
+# Training is therefore forced with --device cpu, so the run can never silently
+# half-initialise a CUDA path.
+#
+# PARTITION: this account is only confirmed to work on
+#   --partition=l40s_public --gres=gpu:l40s:1
+# No CPU-only partition has been verified for torch_pr_352_general -- the
+# earlier guess `cpu_public` was rejected by the scheduler. The GPU requested
+# here WILL SIT UNUSED for the whole job; that waste is deliberate and is the
+# price of a confirmed-valid allocation.
+#
+# If `sinfo -s` shows a real CPU-only partition, prefer it -- command-line
+# flags beat these directives, and nothing in the job needs a GPU:
+#   sbatch --partition=<cpu_part> --gres=NONE \
+#          upstream_exon/slurm/train_full.sbatch
+#
+# RESOURCES: 8 CPUs / 32G / 12h. Memory is sized for the 6-mer ridge baseline,
+# which builds a 27,000 x 4,096 design matrix (~885 MB float64 before the
+# scaler copies it). The CNN itself needs well under 2G. If 32G is rejected:
+#   sbatch --mem=16G upstream_exon/slurm/train_full.sbatch --skip-baselines
+#
+# TESTS are NOT run here. A missing pytest killed job 20673283 before training
+# started. Tests belong in their own job so a tooling gap can never cost a
+# training run, and so a real test failure is never silently swallowed:
+#   sbatch upstream_exon/slurm/run_tests.sbatch
 #
 # RESUME: --requeue alone does NOT make the trainer continue from a
 # checkpoint; it only re-runs the script. This script therefore detects
@@ -85,8 +108,17 @@ if [[ "${ROWS}" -lt "${EXPECTED_ROWS}" ]]; then
 fi
 
 echo "host=$(hostname)  job=${SLURM_JOB_ID:-none}  run=${RUN_NAME}"
-nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
-"$PYTHON_BIN" -c "import torch; print('torch', torch.__version__, '| cuda', torch.cuda.is_available())"
+
+# Keep every numeric backend inside the allocation. Without this each library
+# spawns one thread per visible core and they fight each other.
+NT=${SLURM_CPUS_PER_TASK:-4}
+export OMP_NUM_THREADS="$NT" MKL_NUM_THREADS="$NT" \
+       OPENBLAS_NUM_THREADS="$NT" NUMEXPR_NUM_THREADS="$NT"
+echo "threads: $NT"
+
+"$PYTHON_BIN" -c "import torch; print('torch', torch.__version__,
+      '| cuda available:', torch.cuda.is_available(),
+      '| threads:', torch.get_num_threads())"
 
 # --- make --requeue actually resume -------------------------------------
 RESUME_ARG=()
@@ -101,11 +133,7 @@ else
 fi
 
 echo
-echo "=== unit tests ==="
-"$PYTHON_BIN" -m pytest upstream_exon/tests/test_upstream.py -q
-
-echo
-echo "=== training ==="
+echo "=== training (CPU) ==="
 srun "$PYTHON_BIN" upstream_exon/train_upstream.py \
     --run-name "${RUN_NAME}" \
     --results-csv "$RESULTS" \
@@ -117,7 +145,9 @@ srun "$PYTHON_BIN" upstream_exon/train_upstream.py \
     --l2-smooth 1e-3 \
     --loss mse \
     --kmer-k 6 \
-    --num-workers 4 \
+    --device cpu \
+    --threads "$NT" \
+    --num-workers 2 \
     --seed 42 \
     "${RESUME_ARG[@]+"${RESUME_ARG[@]}"}" \
     "$@"

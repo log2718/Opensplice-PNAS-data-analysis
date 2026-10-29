@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import random
 import sys
 import time
@@ -376,7 +377,13 @@ def build_parser() -> argparse.ArgumentParser:
     r = ap.add_argument_group("runtime")
     r.add_argument("--run-name", default="seq_v1")
     r.add_argument("--out-dir", default=str(RUNS))
-    r.add_argument("--device", default=None)
+    r.add_argument("--device", default=None,
+                   help="cpu / cuda / cuda:0. Default: cuda when "
+                        "available, else cpu.")
+    r.add_argument("--threads", type=int, default=None,
+                   help="torch intra-op threads. Default: honour "
+                        "SLURM_CPUS_PER_TASK when set, else leave "
+                        "torch's default.")
     r.add_argument("--seed", type=int, default=42)
     r.add_argument("--num-workers", type=int, default=0)
     r.add_argument("--resume", action="store_true")
@@ -388,11 +395,33 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def resolve_device(spec: str | None) -> torch.device:
+    """Pick the device, failing loudly if CUDA was asked for but is absent."""
     if spec:
-        return torch.device(spec)
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    return torch.device("cpu")
+        dev = torch.device(spec)
+        if dev.type == "cuda" and not torch.cuda.is_available():
+            raise SystemExit(
+                "--device cuda requested but torch reports no CUDA. This "
+                "build is CPU-only; use --device cpu.")
+        return dev
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def configure_threads(n: int | None) -> int:
+    """Cap intra-op threads so a CPU run stays inside its allocation.
+
+    Unconstrained, torch grabs every core it can see, which oversubscribes a
+    SLURM allocation and makes the job slower, not faster.
+    """
+    if n is None:
+        env = os.environ.get("SLURM_CPUS_PER_TASK")
+        n = int(env) if env and env.isdigit() else None
+    if n and n > 0:
+        torch.set_num_threads(n)
+        try:
+            torch.set_num_interop_threads(max(1, min(2, n)))
+        except RuntimeError:
+            pass          # already initialised; harmless
+    return torch.get_num_threads()
 
 
 def main(argv=None) -> int:
@@ -408,7 +437,12 @@ def main(argv=None) -> int:
     run_dir = Path(args.out_dir) / args.run_name
     run_dir.mkdir(parents=True, exist_ok=True)
     device = resolve_device(args.device)
+    nthread = configure_threads(args.threads)
     logger.info("run_dir=%s  device=%s", run_dir, device)
+    logger.info("torch %s | cuda available=%s | intra-op threads=%d",
+                torch.__version__, torch.cuda.is_available(), nthread)
+    if device.type == "cpu":
+        logger.info("CPU training: 5,324-parameter model, no CUDA required")
 
     # ---- data -------------------------------------------------------
     df = D.load_scored(Path(args.results_csv), Path(args.manifest_csv))
