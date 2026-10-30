@@ -10,8 +10,16 @@ against zero. Three levels:
                  this one is expected to fail; if it does not, the CNN's
                  advantage is not about motifs.
 ``kmer``         ridge on k-mer counts (k=6 by default). Position-blind but
-                 motif-aware. This is the comparator that matters: if the CNN
-                 cannot beat it, the learned position biases are buying nothing.
+                 motif-aware. This is the comparator that matters: it asks
+                 whether the CNN predicts better than position-blind k-mer
+                 counting does.
+
+NOTE on interpretation: beating the k-mer ridge shows the CNN as a whole adds
+predictive value over position-blind motif counts. It does NOT isolate the
+contribution of the learned positional biases -- the two models differ in
+architecture, fitting and capacity, not only in whether position is used. That
+question needs an ablation of the same CNN with and without its position bias,
+which is not implemented here.
 """
 
 from __future__ import annotations

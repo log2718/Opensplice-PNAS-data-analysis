@@ -463,7 +463,7 @@ Opensplice-analysis/
 2. Train the §C.5 sequence-only model from scratch: MSE, Adam, early stopping, `--no-batchnorm`, with L1 and position-bias smoothness; sweep both penalties on a small grid.
 3. Compare against three references **before** interpreting anything:
    - **mean predictor** (floor);
-   - **k-mer ridge regression** (6-mer counts → `AG_mean_logit`) — a position-blind linear comparator. If ridge matches the conv model, position adds nothing and you should say so.
+   - **k-mer ridge regression** (6-mer counts → `AG_mean_logit`) — a position-blind linear comparator. If ridge matches the conv model, the CNN is adding no predictive value over position-blind motif counting, and you should say so. **[CORRECTION]** an earlier version of this line claimed it would show "position adds nothing"; that overstates it. The two models differ in architecture, fitting and capacity, not only in whether position is used, so this comparison cannot isolate the positional bias. Isolating it requires an ablation of the same CNN with and without its position bias.
    - **Arm 2**: the same model with `conv_incl` / `conv_skip` loaded from `model_weights.pt` via `load_partial_state_dict` and frozen — the direct test of whether upstream-exon effects use the within-exon motif vocabulary (§D).
 4. Then interpret: filter PWMs as logos, position-bias curves, and the pre-tuner `z` against the target to read off whether the relationship is linear or compressive (the latter being the quantitative signature of saturation).
 

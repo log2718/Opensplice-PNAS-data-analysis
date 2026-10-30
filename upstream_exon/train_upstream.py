@@ -38,8 +38,12 @@ for _p in (str(_THIS_DIR), str(ROOT)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-import baselines as BL  # noqa: E402
 import dataset_upstream as D  # noqa: E402
+# NOTE: `baselines` is imported lazily, where it is used. It needs
+# sklearn, which the CNN does not -- an eager import here killed job
+# 21396228 before epoch 1 with ModuleNotFoundError: sklearn, and
+# --skip-baselines could not rescue it. Optional extras must never be
+# able to cost a training run.
 from model_upstream import UpstreamExonModel  # noqa: E402
 
 OUT = ROOT / "outputs" / "upstream_exon"
@@ -187,9 +191,13 @@ def beyond_composition_metrics(train_df: pd.DataFrame, eval_df: pd.DataFrame,
     predicts the composition-RESIDUALIZED target on the evaluation split. A
     model that is only reading base content scores ~0 here.
     """
-    import baselines as _BL
     from scipy import stats
     if len(train_df) < 10 or len(eval_df) < 5:
+        return {}
+    try:
+        import baselines as _BL
+    except ImportError as e:                      # sklearn absent
+        logger.warning("beyond-composition metric skipped: %s", e)
         return {}
     comp = _BL.composition_baseline().fit(
         train_df.b1.tolist(), train_df.y_true.to_numpy())
@@ -387,7 +395,11 @@ def build_parser() -> argparse.ArgumentParser:
     r.add_argument("--seed", type=int, default=42)
     r.add_argument("--num-workers", type=int, default=0)
     r.add_argument("--resume", action="store_true")
-    r.add_argument("--skip-baselines", action="store_true")
+    r.add_argument("--skip-baselines", action="store_true",
+                   help="train the CNN only; no sklearn required")
+    r.add_argument("--expect-rows", type=int, default=0,
+                   help="require exactly this many labeled rows "
+                        "(0 disables the check)")
     r.add_argument("--kmer-k", type=int, default=6)
     r.add_argument("--smoke", action="store_true",
                    help="tiny run: 3 epochs, subsample, CPU-friendly")
@@ -424,11 +436,80 @@ def configure_threads(n: int | None) -> int:
     return torch.get_num_threads()
 
 
+# Packages the CNN itself cannot run without.
+CORE_DEPS = ("numpy", "pandas", "scipy", "matplotlib")
+# Packages only the reference baselines need.
+BASELINE_DEPS = ("sklearn",)
+
+
+def preflight(args) -> None:
+    """Fail before training, not after it.
+
+    Checks every import the run will eventually need and the size of the
+    labeled dataset. A 400-epoch run that dies at the evaluation step has
+    wasted the whole allocation, which is what job 21396228 did: it fell over
+    on a missing sklearn 24 seconds in, and a later failure would have cost
+    hours instead.
+    """
+    import importlib
+
+    needed = list(CORE_DEPS)
+    if not args.skip_baselines:
+        needed += list(BASELINE_DEPS)
+
+    missing = []
+    for m in needed:
+        try:
+            importlib.import_module(m)
+        except ImportError as e:
+            missing.append((m, str(e)))
+
+    if missing:
+        lines = ["PREFLIGHT FAILED: missing required packages"]
+        for m, err in missing:
+            lines.append(f"  {m}: {err}")
+        if any(m in dict(missing) for m in BASELINE_DEPS):
+            lines += [
+                "",
+                "The baselines (constant, composition ridge, k-mer ridge) are",
+                "part of the experiment, not an optional extra, so a full run",
+                "requires scikit-learn. Install it:",
+                "  python -m pip install scikit-learn",
+                "",
+                "To train the CNN alone, without the baselines, pass",
+                "--skip-baselines explicitly -- then sklearn is not needed.",
+            ]
+        raise SystemExit("\n".join(lines))
+
+    # ---- dataset size -------------------------------------------------
+    results = Path(args.results_csv)
+    if not results.exists():
+        raise SystemExit(f"PREFLIGHT FAILED: missing results CSV {results}")
+    if args.expect_rows > 0:
+        with results.open() as fh:
+            n = sum(1 for _ in fh) - 1          # minus the header
+        if n != args.expect_rows:
+            raise SystemExit(
+                f"PREFLIGHT FAILED: {results.name} has {n:,} labeled rows, "
+                f"expected exactly {args.expect_rows:,}.\n"
+                "  Finish AlphaGenome scoring, or pass --expect-rows 0 to\n"
+                "  disable this check (and say so when reporting results --\n"
+                "  a partial library is a different experiment).")
+        logger.info("preflight: %s labeled rows (as expected)", f"{n:,}")
+
+    logger.info("preflight OK: %s%s",
+                ", ".join(needed),
+                "" if not args.skip_baselines else "  (baselines skipped)")
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s  %(message)s",
         datefmt="%H:%M:%S")
+
+    # Before anything expensive.
+    preflight(args)
 
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -615,7 +696,25 @@ def main(argv=None) -> int:
 
     # ---- baselines --------------------------------------------------
     base_rows = []
+    BL = None
     if not args.skip_baselines:
+        # preflight() already proved this imports; if it fails here the
+        # environment changed mid-run, which is a hard error -- the baselines
+        # are part of the experiment, not a nicety. Silently dropping them
+        # would leave the CNN's numbers with nothing to be judged against.
+        try:
+            import baselines as BL
+        except ImportError as e:
+            raise SystemExit(
+                f"FATAL: the baselines are required but sklearn failed to "
+                f"import: {e}\n"
+                "  Training finished and its checkpoints/metrics are saved in "
+                f"{run_dir},\n"
+                "  but the comparison table could not be built. Install "
+                "scikit-learn and\n"
+                "  re-run the evaluation, or pass --skip-baselines to declare "
+                "a CNN-only run.")
+    if BL is not None:
         # Baselines are fitted and scored in ORIGINAL logit units so their
         # MSE/MAE/R2 are directly comparable to the model's reported metrics.
         tr_df = df[df.split == "train"]
@@ -631,11 +730,13 @@ def main(argv=None) -> int:
                                   **regression_metrics(
                                       scaler.inverse(g[D.TARGET_COL].to_numpy()),
                                       yp)})
-        for s in ("val", "test"):
-            if s in results:
-                base_rows.append({"model": "UpstreamExonModel", "split": s,
-                                  **{k: v for k, v in results[s].items()
-                                     if not k.startswith("pair_")}})
+    # The model's own rows go in whether or not the baselines could be fitted,
+    # so the table is never silently empty.
+    for s in ("val", "test"):
+        if s in results:
+            base_rows.append({"model": "UpstreamExonModel", "split": s,
+                              **{k: v for k, v in results[s].items()
+                                 if not k.startswith("pair_")}})
     base = pd.DataFrame(base_rows)
     if not base.empty:
         base.to_csv(run_dir / "baseline_comparison.csv", index=False)

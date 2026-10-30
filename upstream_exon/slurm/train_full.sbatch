@@ -52,6 +52,13 @@
 # scaler copies it). The CNN itself needs well under 2G. If 32G is rejected:
 #   sbatch --mem=16G upstream_exon/slurm/train_full.sbatch --skip-baselines
 #
+# PREFLIGHT: the trainer now checks every import it will need (including
+# sklearn, since the baselines are part of the experiment) and that the
+# dataset holds exactly EXPECTED_ROWS labeled sequences -- BEFORE training
+# starts. A missing dependency fails in seconds, not after 400 epochs.
+# A CNN-only run is still possible, but must say so explicitly:
+#   sbatch upstream_exon/slurm/train_full.sbatch --skip-baselines
+#
 # TESTS are NOT run here. A missing pytest killed job 20673283 before training
 # started. Tests belong in their own job so a tooling gap can never cost a
 # training run, and so a real test failure is never silently swallowed:
@@ -156,6 +163,7 @@ srun "$PYTHON_BIN" upstream_exon/train_upstream.py \
     --threads "$NT" \
     --num-workers 2 \
     --seed 42 \
+    --expect-rows "${EXPECTED_ROWS}" \
     "${RESUME_ARG[@]+"${RESUME_ARG[@]}"}" \
     "$@"
 
