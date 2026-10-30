@@ -127,35 +127,41 @@ python upstream_exon/build_b1_dataset_v2.py --validate-only
 python upstream_exon/build_b1_dataset_v2.py
 ```
 
-### 2. Determine valid SLURM resources FIRST
+### 2. SLURM resources
 
-`cpu_public` does not exist on Torch — submission fails with
-`Error partition 'cpu_public' is not valid for this job`. Run the probe on a
-login node and send the output back so resources can be set from fact:
+The training job requests **no partition and no GPU** — only
+`--account=torch_pr_352_general` — so it lands on the cluster default
+partition. This is evidence-based, not assumed: every AlphaGenome scoring and
+analysis job in this repo (`run_tp53_wide_hybrids.sbatch`,
+`run_chimera8_score.sbatch`, `run_synthetic_chimeras.sbatch`, …) declares the
+account alone, and those jobs ran to completion on CPU nodes
+`cs655` / `cs667` / `cs695` / `cs787` (committed `slurm-177*.out` logs).
+
+Two things to keep straight:
+
+- `torch_pr_352_general` is a SLURM **account**, not a partition.
+- `cpu_public` is **not** a partition here — submission fails with
+  `Error partition 'cpu_public' is not valid for this job`.
+
+`--partition=l40s_public --gres=gpu:l40s:1` also validates, but it reserves an
+L40S that a CPU-only torch build never touches and it queues behind GPU
+demand — job `21316880` sat pending with `Reason=None` for exactly that
+reason. It remains the fallback if the default partition ever refuses the job:
+
+```bash
+sbatch --partition=l40s_public --gres=gpu:l40s:1 \
+       upstream_exon/slurm/train_full.sbatch
+```
+
+To see the full picture for yourself (read-only, submits nothing):
 
 ```bash
 bash upstream_exon/slurm/probe_slurm.sh | tee slurm_probe.txt
 ```
 
-It is read-only (it submits nothing; section 7 uses `sbatch --test-only`) and
-reports which partitions exist, which the account may use, whether any accepts
-a CPU-only job, and each partition's walltime cap.
-
-**Until that is known**, every script defaults to the one allocation confirmed
-to work on this account:
-
-```
---partition=l40s_public --gres=gpu:l40s:1 --cpus-per-task=4 --mem=12G
-```
-
-**This means the scoring job holds an L40S it never uses** — it is pure
-network I/O to the AlphaGenome API. At ~0.55 s/call that is ~1.5 idle
-GPU-hours per 10,000-call chunk, ~5.8 GPU-hours for the remaining 38,200 —
-which is why scoring is chunked rather than held as one long reservation. If the probe reveals a CPU-only partition, override it:
-
-```bash
-PARTITION=<cpu_part> GRES=NONE bash upstream_exon/slurm/submit_pipeline.sh --go
-```
+The **scoring** scripts still carry the `l40s_public` directives. Scoring is
+finished (all 40,000 labels are in), so they were left untouched rather than
+re-tested.
 
 ### 3. Submit the pipeline
 

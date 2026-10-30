@@ -1,8 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=b1_full
 #SBATCH --account=torch_pr_352_general
-#SBATCH --partition=l40s_public
-#SBATCH --gres=gpu:l40s:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=12:00:00
@@ -28,16 +26,25 @@
 # Training is therefore forced with --device cpu, so the run can never silently
 # half-initialise a CUDA path.
 #
-# PARTITION: this account is only confirmed to work on
-#   --partition=l40s_public --gres=gpu:l40s:1
-# No CPU-only partition has been verified for torch_pr_352_general -- the
-# earlier guess `cpu_public` was rejected by the scheduler. The GPU requested
-# here WILL SIT UNUSED for the whole job; that waste is deliberate and is the
-# price of a confirmed-valid allocation.
+# PARTITION: no --partition and no --gres are requested, so the job lands on
+# the cluster default partition. That is not a guess: the AlphaGenome scoring
+# and analysis jobs in this repo (run_tp53_wide_hybrids.sbatch,
+# run_chimera8_score.sbatch, run_synthetic_chimeras.sbatch, ...) all declare
+# only --account=torch_pr_352_general with no partition and no gres, and they
+# ran to completion on CPU nodes cs655 / cs667 / cs695 / cs787
+# (see the committed slurm-177*.out logs). The default partition therefore
+# accepts a CPU-only job from this account.
 #
-# If `sinfo -s` shows a real CPU-only partition, prefer it -- command-line
-# flags beat these directives, and nothing in the job needs a GPU:
-#   sbatch --partition=<cpu_part> --gres=NONE \
+# `cpu_public` is NOT a partition on this cluster -- submitting to it fails
+# with "Error partition 'cpu_public' is not valid for this job". Note also
+# that torch_pr_352_general is a SLURM *account*, not a partition.
+#
+# Requesting --partition=l40s_public --gres=gpu:l40s:1 also works, but it
+# reserves an L40S this job never touches (torch is a CPU-only build) and it
+# queues behind GPU demand -- which is why job 21316880 sat pending with
+# Reason=None. If the default partition ever rejects the job, that GPU
+# allocation is the fallback:
+#   sbatch --partition=l40s_public --gres=gpu:l40s:1 \
 #          upstream_exon/slurm/train_full.sbatch
 #
 # RESOURCES: 8 CPUs / 32G / 12h. Memory is sized for the 6-mer ridge baseline,
@@ -107,7 +114,7 @@ if [[ "${ROWS}" -lt "${EXPECTED_ROWS}" ]]; then
     exit 1
 fi
 
-echo "host=$(hostname)  job=${SLURM_JOB_ID:-none}  run=${RUN_NAME}"
+echo "host=$(hostname)  job=${SLURM_JOB_ID:-none}  partition=${SLURM_JOB_PARTITION:-default}  run=${RUN_NAME}"
 
 # Keep every numeric backend inside the allocation. Without this each library
 # spawns one thread per visible core and they fight each other.

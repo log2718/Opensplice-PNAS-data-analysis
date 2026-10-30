@@ -1,8 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=b1_tests
 #SBATCH --account=torch_pr_352_general
-#SBATCH --partition=l40s_public
-#SBATCH --gres=gpu:l40s:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=12G
 #SBATCH --time=00:20:00
@@ -18,9 +16,10 @@
 #   * a REAL test failure is never silently swallowed -- this job exits
 #     non-zero and says so.
 #
-# Nothing here needs a GPU. The allocation mirrors the only one confirmed to
-# work on this account; override if a CPU-only partition exists:
-#   sbatch --partition=<cpu_part> --gres=NONE upstream_exon/slurm/run_tests.sbatch
+# Nothing here needs a GPU, so no --partition and no --gres are requested and
+# the job lands on the cluster default partition -- the same allocation the
+# repo's scoring jobs used successfully on CPU nodes cs655/cs667/cs695/cs787.
+# See train_full.sbatch for the evidence and the GPU fallback.
 #
 #     mkdir -p logs
 #     sbatch upstream_exon/slurm/run_tests.sbatch
@@ -42,7 +41,7 @@ NT=${SLURM_CPUS_PER_TASK:-4}
 export OMP_NUM_THREADS="$NT" MKL_NUM_THREADS="$NT" \
        OPENBLAS_NUM_THREADS="$NT" NUMEXPR_NUM_THREADS="$NT"
 
-echo "host=$(hostname)  job=${SLURM_JOB_ID:-none}"
+echo "host=$(hostname)  job=${SLURM_JOB_ID:-none}  partition=${SLURM_JOB_PARTITION:-default}"
 "$PYTHON_BIN" -c "import torch; print('torch', torch.__version__,
       '| cuda available:', torch.cuda.is_available())"
 echo
