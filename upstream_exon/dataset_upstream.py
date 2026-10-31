@@ -134,8 +134,12 @@ def build_datasets(df: pd.DataFrame, *, use_structure: bool = False,
         if use_structure:
             xt, xw = encode_structure(seqs, rnafold_bin=rnafold_bin,
                                       num_threads=num_threads)
-        out[name] = B1Dataset(xs, g[TARGET_COL].to_numpy(), xt, xw,
-                              g.alpha.to_numpy())
+        # v3's fixed-composition library has no alpha axis; a constant
+        # stand-in keeps the downstream per-alpha reporting code uniform
+        # instead of branching on the design everywhere.
+        alpha = (g.alpha.to_numpy() if "alpha" in g.columns
+                 else np.zeros(len(g), dtype=np.float32))
+        out[name] = B1Dataset(xs, g[TARGET_COL].to_numpy(), xt, xw, alpha)
     return out
 
 

@@ -31,3 +31,14 @@ __pycache__/
 #analysis_script/make_chimera8_context_plots.py). The index CSV beside them
 #is NOT ignored -- label_saturation.py needs it.
 outputs/synthetic_context_8block/plots/contexts/*/*.png
+
+#v3 fixed-composition B1 library: the manifest is ~150 MB and the results
+#CSV ~60 MB. The manifest is NOT committed because it is reproducible from
+#the seed in under a minute:
+#    python upstream_exon/build_b1_dataset_v3.py
+#manifest_fingerprint.json IS committed and proves a rebuilt manifest is
+#byte-identical. The AlphaGenome results are rsynced, like the model runs.
+outputs/upstream_exon/dataset_v3/b1_primary_manifest.csv
+outputs/upstream_exon/dataset_v3/b1_*_ag_results.csv
+outputs/upstream_exon/dataset_v3/b1_*_failed.csv
+outputs/upstream_exon/dataset_v3/*.lock

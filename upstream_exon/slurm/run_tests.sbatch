@@ -58,7 +58,8 @@ if ! "$PYTHON_BIN" -c "import pytest" 2>/dev/null; then
 fi
 
 echo "=== unit tests ==="
-"$PYTHON_BIN" -m pytest upstream_exon/tests/test_upstream.py -q
+"$PYTHON_BIN" -m pytest upstream_exon/tests/test_upstream.py \
+                       upstream_exon/tests/test_upstream_v3.py -q
 rc=$?
 echo
 if [[ $rc -eq 0 ]]; then

@@ -61,9 +61,17 @@ def exon_syn70(sequence_id: str) -> str:
 
 
 def stratified_head(df: pd.DataFrame, limit: int) -> pd.DataFrame:
-    """Deterministic alpha-stratified subset, for a representative smoke run."""
+    """Deterministic alpha-stratified subset, for a representative smoke run.
+
+    The v3 fixed-composition library has no alpha axis to stratify over (every
+    sequence has the same composition by construction), so there the subset is
+    simply the first ``limit`` rows in manifest order -- which is already a
+    random order with respect to everything that varies.
+    """
     if limit >= len(df):
         return df
+    if "alpha" not in df.columns or df.alpha.nunique() <= 1:
+        return df.head(limit)
     per = {a: int(round(limit * len(g) / len(df)))
            for a, g in df.groupby("alpha")}
     frames = [g.sort_values("b1_id").head(per.get(a, 0))
@@ -88,8 +96,10 @@ def build_jobs(man: pd.DataFrame, syn70: str) -> list[dict]:
             raise SystemExit(f"{r.row_id}: structural validation failed: {fails}")
         jobs.append({
             "row_id": r.row_id, "b1_id": r.b1_id,
-            "sequence_id": r.sequence_id, "alpha": r.alpha,
+            "sequence_id": r.sequence_id,
+            "alpha": getattr(r, "alpha", float("nan")),
             "split": r.split, "b1_sha256": r.b1_sha256,
+            "pilot": bool(getattr(r, "pilot", False)),
             "gc": r.gc, "max_homopolymer": r.max_homopolymer,
             "core": core, "exon_start": start, "exon_len": r.exon_len,
         })
@@ -107,6 +117,10 @@ def main() -> int:
                     help="score only this many rows (alpha-stratified); "
                          "results append to the same CSV, so a smoke run's "
                          "calls count toward the full job")
+    ap.add_argument("--pilot-only", action="store_true",
+                    help="score only the rows the manifest marks pilot=True "
+                         "(v3). Their labels land in the same results CSV, so "
+                         "the full run reuses them instead of re-calling.")
     ap.add_argument("--max-new-calls", type=int, default=None,
                     help="score at most this many NOT-YET-SCORED rows, taken "
                          "in manifest order. Lets one SLURM job fit inside a "
@@ -125,6 +139,13 @@ def main() -> int:
         raise SystemExit(f"missing {man_path}; run build_b1_dataset.py first")
 
     man = pd.read_csv(man_path)
+    if args.pilot_only:
+        if "pilot" not in man.columns:
+            raise SystemExit(
+                f"--pilot-only: {man_path.name} has no 'pilot' column "
+                "(only the v3 manifest marks a pilot subset)")
+        man = man[man.pilot.astype(bool)].reset_index(drop=True)
+        print(f"[pilot]  restricted to the {len(man)} pilot rows")
     syn70 = exon_syn70(man.sequence_id.iloc[0])
     res_path = DATA / res_name
 
@@ -152,8 +173,9 @@ def main() -> int:
     # re-verify the whole manifest before making its first call.
     jobs = build_jobs(subset, syn70)
     print(f"[verify] {len(jobs)} constructs rebuilt and SHA-256 verified")
-    print(f"[plan]   middle exon {man.sequence_id.iloc[0]}, "
-          f"alpha mix {subset.alpha.value_counts().sort_index().to_dict()}")
+    mix = (subset.alpha.value_counts().sort_index().to_dict()
+           if "alpha" in subset.columns else "n/a (fixed composition)")
+    print(f"[plan]   middle exon {man.sequence_id.iloc[0]}, alpha mix {mix}")
     print(f"[plan]   MAXIMUM NEW ALPHAGENOME CALLS: {len(jobs)}")
     print(f"[plan]   after this job: "
           f"{len(done_ids) + len(jobs)}/{total} labeled")

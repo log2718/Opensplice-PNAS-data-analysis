@@ -17,14 +17,15 @@ analysis stay reproducible.
 
 ## Datasets
 
-| | `dataset_v1` | **`dataset_v2`** (current) |
-|---|---|---|
-| Sequences | 10,000 | **40,000** |
-| Sampling | one Dirichlet vector per sequence | **one vector per group, 4 sequences each** |
-| Groups | — | **10,000** |
-| α mixture (20/40/40) | 2,000 / 4,000 / 4,000 seqs | 8,000 / 16,000 / 16,000 seqs |
-| Splits | 80/10/10 by sequence | **27,000 / 3,000 / 10,000, by group** |
-| Labeled | 300 (preserved) | in progress |
+| | `dataset_v1` | `dataset_v2` | **`dataset_v3`** (current) |
+|---|---|---|---|
+| Sequences | 10,000 | 40,000 | **250,000** |
+| Sampling | one Dirichlet vector per sequence | one vector per group, 4 sequences each | **random permutation of a fixed multiset** |
+| Composition | varies | varies (matched in expectation within a group) | **identical everywhere: 29 A / 28 C / 28 G / 28 T** |
+| Groups | — | 10,000 | — |
+| α mixture (20/40/40) | 2,000 / 4,000 / 4,000 seqs | 8,000 / 16,000 / 16,000 seqs | — (no α axis) |
+| Splits | 80/10/10 by sequence | 27,000 / 3,000 / 10,000, by group | **200,000 / 10,000 / 40,000** |
+| Labeled | 300 (preserved) | 40,000 (complete) | pilot 1,000, then full |
 
 **v1 is preserved in full**, including its 300 labeled examples. v2 uses a
 different seed stream and explicitly excludes every sequence already used by
@@ -43,6 +44,35 @@ arm, and it is the sharpest available test that the CNN is not just a
 composition readout. It matters: on the v1 data a composition-only ridge
 already reaches test R² ≈ 0.35, and the CNN's R² on the composition
 *residual* was **negative** at n = 247.
+
+### Why fixed composition (v3)
+
+The v2 analysis showed that composition, not motifs, dominated the response:
+a gradient-boosted model on **three base frequencies reached test R² 0.721**,
+beating both the CNN (0.668) and the 6-mer ridge (0.709), and the k-mer sweep
+saturated at that same ceiling. The v2 grouped design matched composition only
+*in expectation*; realized counts still varied within a group.
+
+v3 removes the axis outright. Every sequence is a permutation of the same
+multiset, so base counts, GC and sequence entropy are **constant across the
+whole library** and cannot explain anything. Whatever is left is nucleotide
+**order**: dinucleotide structure, k-mers, and position.
+
+113 is not divisible by 4, so one base takes the extra copy. A is chosen so
+that G and C stay equal at 28 each — the dominant v2 filter was a (G−C)
+counter, and this denies it an asymmetry to read.
+
+Dinucleotide frequencies are deliberately *not* fixed: they are part of the
+order signal being measured. A library that also fixed them would be a
+stricter, different experiment.
+
+**Is there anything left to measure?** Estimated from data already paid for,
+rather than assumed: among v2 sequences that happen to share exactly the same
+base counts, the pooled SD of `AG_mean_logit` is **0.368** (6,468 sequences in
+3,105 composition cells), about 30% of v2's total variance. AlphaGenome
+quantizes probabilities to ~1/256, which near p ≈ 0.95 is ~0.041 logit, so
+that residual is roughly **9 quantization steps** — measurable, but coarse
+enough that the 1,000-sequence pilot checks it directly before the full run.
 
 ---
 
@@ -219,10 +249,46 @@ bash upstream_exon/slurm/submit_pipeline.sh --go --train-only
 `.env.alphagenome` must sit at the **repo root** on the cluster, not in the
 dataset directory.
 
+### 4b. The v3 fixed-composition experiment
+
+The v3 manifest is ~150 MB and is **not committed**; it is reproducible from
+the seed in ~20 s, and `manifest_fingerprint.json` (committed) proves a
+rebuild is byte-identical.
+
+```bash
+# on Torch, after pulling
+python upstream_exon/build_b1_dataset_v3.py --validate-only   # 9 check groups
+python upstream_exon/build_b1_dataset_v3.py                   # writes manifest
+
+# pilot: 1,000 calls (~9 min), drawn from TRAIN so the full run reuses them
+mkdir -p logs
+PILOT=1 sbatch --array=0-0 --time=01:00:00 upstream_exon/slurm/score_b1_v3.sbatch
+python upstream_exon/analyze_b1_v3_pilot.py      # prints GO / NO-GO
+
+# full scoring: 13 shards of 20,000, strictly one at a time (~35-46 h total)
+sbatch --array=0-12%1 upstream_exon/slurm/score_b1_v3.sbatch
+
+# training (resumable; resubmit to continue)
+sbatch upstream_exon/slurm/train_full_v3.sbatch
+```
+
+The pilot's verdict is mechanical: it exits non-zero unless the response has
+≥ 20 distinct values and an SD of ≥ 3 quantization steps, and neither splice
+site is saturated at p ≈ 1.
+
+Baselines change for v3 (`--baseline-set fixed_composition`). The composition
+ridge is **degenerate** there — its features have zero variance, so it can
+only predict the training mean — and is replaced by a **dinucleotide ridge**.
+The 6-mer ridge uses a streaming Gram solver: a 200,000 × 4,096 design is
+3.3 GB as float32 and sklearn's `StandardScaler` + `RidgeCV` path copies it
+twice more, so the features are folded into `X'X` (134 MB) in chunks instead
+and every penalty is solved against one eigendecomposition.
+
 ### 5. Tests
 
 ```bash
-python -m pytest upstream_exon/tests/test_upstream.py -q     # 46 tests, ~6 s
+python -m pytest upstream_exon/tests/test_upstream.py -q       # 46 tests, ~6 s
+python -m pytest upstream_exon/tests/test_upstream_v3.py -q    # 27 tests, ~2 s
 ```
 
 ---

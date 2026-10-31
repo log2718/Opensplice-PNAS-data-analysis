@@ -184,12 +184,18 @@ def metrics_by_composition(df: pd.DataFrame, n_bins: int = 5) -> pd.DataFrame:
 
 
 def beyond_composition_metrics(train_df: pd.DataFrame, eval_df: pd.DataFrame,
-                               kmer_k: int = 6) -> dict:
-    """How much of the model's skill survives removing composition?
+                               kmer_k: int = 6,
+                               design: str = "dirichlet") -> dict:
+    """How much of the model's skill survives removing the simple features?
 
-    Fits a composition-only ridge on train, then asks how well the CNN
-    predicts the composition-RESIDUALIZED target on the evaluation split. A
-    model that is only reading base content scores ~0 here.
+    Fits a simple-feature ridge on train, then asks how well the CNN predicts
+    the RESIDUALIZED target on the evaluation split. A model that is only
+    reading those simple features scores ~0 here.
+
+    Which features count as "simple" depends on the library. Under the v1/v2
+    Dirichlet design it is nucleotide composition. Under the v3
+    fixed-composition design composition is constant and explains nothing by
+    construction, so the comparable floor is dinucleotide frequency.
     """
     from scipy import stats
     if len(train_df) < 10 or len(eval_df) < 5:
@@ -199,12 +205,17 @@ def beyond_composition_metrics(train_df: pd.DataFrame, eval_df: pd.DataFrame,
     except ImportError as e:                      # sklearn absent
         logger.warning("beyond-composition metric skipped: %s", e)
         return {}
-    comp = _BL.composition_baseline().fit(
+    if design == "fixed_composition":
+        simple, label = _BL.dinucleotide_baseline(), "dinucleotide"
+    else:
+        simple, label = _BL.composition_baseline(), "composition"
+    comp = simple.fit(
         train_df.b1.tolist(), train_df.y_true.to_numpy())
     comp_pred = comp.predict(eval_df.b1.tolist())
     resid_true = eval_df.y_true.to_numpy() - comp_pred
     resid_pred = eval_df.y_pred.to_numpy() - comp_pred
     out = {
+        "beyond_feature_set": label,
         "composition_only_r2": float(
             regression_metrics(eval_df.y_true.to_numpy(), comp_pred)["r2"]),
         "model_r2_on_composition_residual": float(
@@ -401,6 +412,16 @@ def build_parser() -> argparse.ArgumentParser:
                    help="require exactly this many labeled rows "
                         "(0 disables the check)")
     r.add_argument("--kmer-k", type=int, default=6)
+    r.add_argument("--baseline-set", choices=["dirichlet", "fixed_composition"],
+                   default="dirichlet",
+                   help="which reference models to fit. 'dirichlet' (v1/v2): "
+                        "constant, composition ridge, k-mer ridge. "
+                        "'fixed_composition' (v3): constant, DINUCLEOTIDE "
+                        "ridge, k-mer ridge fitted with the streaming Gram "
+                        "solver -- the composition ridge is degenerate when "
+                        "every sequence has the same base counts, and a "
+                        "200,000-row k-mer design does not fit in memory the "
+                        "sklearn way.")
     r.add_argument("--smoke", action="store_true",
                    help="tiny run: 3 epochs, subsample, CPU-friendly")
     return ap
@@ -674,7 +695,8 @@ def main(argv=None) -> int:
             if split == "train":
                 continue
             results[split].update(beyond_composition_metrics(
-                tr_pred, preds[preds.split == split], args.kmer_k))
+                tr_pred, preds[preds.split == split], args.kmer_k,
+                design=args.baseline_set))
 
     per_alpha = []
     for s in preds.split.unique():
@@ -718,15 +740,28 @@ def main(argv=None) -> int:
         # Baselines are fitted and scored in ORIGINAL logit units so their
         # MSE/MAE/R2 are directly comparable to the model's reported metrics.
         tr_df = df[df.split == "train"]
-        for b in BL.all_baselines(args.kmer_k):
-            b.fit(tr_df.b1.tolist(),
-                  scaler.inverse(tr_df[D.TARGET_COL].to_numpy()))
+        va_df = df[df.split == "val"]
+        for b in BL.all_baselines_for(args.baseline_set, args.kmer_k):
+            t0b = time.time()
+            y_tr = scaler.inverse(tr_df[D.TARGET_COL].to_numpy())
+            # The streaming Gram ridge picks its penalty on a real validation
+            # split rather than a holdout carved out of train, when one exists.
+            if isinstance(b, BL.GramRidgeBaseline) and not va_df.empty:
+                b.fit(tr_df.b1.tolist(), y_tr, va_df.b1.tolist(),
+                      scaler.inverse(va_df[D.TARGET_COL].to_numpy()))
+            else:
+                b.fit(tr_df.b1.tolist(), y_tr)
+            alpha = getattr(b, "alpha_", None)
+            logger.info("baseline %s fitted in %.1fs%s", b.name,
+                        time.time() - t0b,
+                        f" (alpha={alpha:g})" if alpha is not None else "")
             for s in ("val", "test"):
                 g = df[df.split == s]
                 if g.empty:
                     continue
                 yp = b.predict(g.b1.tolist())
                 base_rows.append({"model": b.name, "split": s,
+                                  "alpha": alpha,
                                   **regression_metrics(
                                       scaler.inverse(g[D.TARGET_COL].to_numpy()),
                                       yp)})
