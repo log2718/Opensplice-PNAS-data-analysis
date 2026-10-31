@@ -55,9 +55,15 @@
 # PREFLIGHT: the trainer now checks every import it will need (including
 # sklearn, since the baselines are part of the experiment) and that the
 # dataset holds exactly EXPECTED_ROWS labeled sequences -- BEFORE training
-# starts. A missing dependency fails in seconds, not after 400 epochs.
+# starts. A missing dependency fails in seconds, not after hundreds of epochs.
 # A CNN-only run is still possible, but must say so explicitly:
 #   sbatch upstream_exon/slurm/train_full.sbatch --skip-baselines
+#
+# EPOCHS: capped at 1000, early stopping unchanged (patience 40). The first
+# full run hit the old 400 cap at epoch 400 with the
+# best val loss at epoch 397 -- still improving, never early-stopped. The
+# raised cap lets it run until patience actually triggers. Resubmitting
+# auto-resumes from last.pt at epoch 401 with the patience counter intact.
 #
 # TESTS are NOT run here. A missing pytest killed job 20673283 before training
 # started. Tests belong in their own job so a tooling gap can never cost a
@@ -152,7 +158,7 @@ srun "$PYTHON_BIN" upstream_exon/train_upstream.py \
     --run-name "${RUN_NAME}" \
     --results-csv "$RESULTS" \
     --manifest-csv "$MANIFEST" \
-    --epochs 400 \
+    --epochs 1000 \
     --batch-size 256 \
     --lr 1e-3 \
     --patience 40 \
