@@ -163,7 +163,12 @@ def main(argv=None) -> int:
     man = pd.read_csv(man_path, usecols=["row_id", "b1", "split", "pilot",
                                          "max_homopolymer", "distinct_3mers",
                                          "distinct_6mers"])
-    df = res.merge(man, on="row_id", how="inner", validate="one_to_one")
+    # The scorer already copies split / gc / max_homopolymer into the results
+    # CSV, so a naive merge renames them to *_x / *_y and every later lookup
+    # silently misses. Take from the manifest only what the results lack --
+    # the same rule dataset_upstream.load_scored uses.
+    keep = [c for c in man.columns if c not in res.columns or c == "row_id"]
+    df = res.merge(man[keep], on="row_id", how="inner", validate="one_to_one")
     pilot = df[df.pilot.astype(bool)] if "pilot" in df else df
 
     y = df.AG_mean_logit.to_numpy()
@@ -228,9 +233,11 @@ def main(argv=None) -> int:
 
     OUTDIR.mkdir(parents=True, exist_ok=True)
     (OUTDIR / "pilot_summary.json").write_text(json.dumps(stats, indent=2))
-    df[["row_id", "split", "AG_acceptor_probability", "AG_donor_probability",
-        "AG_mean_logit", "max_homopolymer", "distinct_3mers",
-        "distinct_6mers"]].to_csv(OUTDIR / "pilot_rows.csv", index=False)
+    cols = [c for c in ("row_id", "split", "AG_acceptor_probability",
+                        "AG_donor_probability", "AG_mean_logit",
+                        "max_homopolymer", "distinct_3mers", "distinct_6mers")
+            if c in df.columns]
+    df[cols].to_csv(OUTDIR / "pilot_rows.csv", index=False)
     pd.Series(y).value_counts().sort_index().rename("n").to_csv(
         OUTDIR / "pilot_response_histogram.csv", header=True)
 
