@@ -55,17 +55,24 @@
 # = 361 MB (plus 90 MB for val+test), the CNN is negligible, and the k-mer
 # baseline peaks around 1.5 GB. 32G is generous; 16G would also do.
 #
-# TIME: measured ~50 s/epoch for 200,000 rows at batch 256 on 8 CPU threads,
-# so 12 h fits roughly 700 epochs. The cap is 400, which is 400 x 782 = 313k
-# gradient steps -- three times full_v2's 104k. If early stopping has not
-# triggered when the walltime ends, just resubmit: the script detects
-# last.pt and resumes with the patience counter intact.
+# TIME: MEASURED on job 21817552 -- 1892.9 s for 400 epochs = 4.7 s/epoch for
+# 200,000 rows at batch 256 on 8 CPU threads. (An earlier estimate here said
+# ~50 s/epoch; that was 10x too pessimistic.) 12 h therefore fits ~9,000
+# epochs, so walltime is not the binding constraint -- patience is.
+#
+# That first 400-epoch run did NOT converge: epoch 400 was still a new best
+# and val loss was falling monotonically, so the cap truncated it rather than
+# early stopping ending it. The default is now 2000 (= 1.56M gradient steps,
+# 15x full_v2's 104k), which patience 40 should stop well short of. If it
+# again ends on a new best, raise EPOCHS and resubmit: the script detects
+# last.pt and resumes with Adam state and the patience counter intact.
 #
 # PREFLIGHT: the trainer checks every import it needs and that the dataset
 # holds exactly EXPECTED_ROWS labeled rows BEFORE training starts.
 #
 #     mkdir -p logs
 #     sbatch upstream_exon/slurm/train_full_v3.sbatch
+#     EPOCHS=4000 sbatch upstream_exon/slurm/train_full_v3.sbatch  # train longer
 #     FRESH=1 sbatch upstream_exon/slurm/train_full_v3.sbatch    # ignore ckpts
 #     EXPECTED_ROWS=100000 sbatch upstream_exon/slurm/train_full_v3.sbatch
 #                                                   # train on a partial library
@@ -75,7 +82,7 @@ set -euo pipefail
 REPO=/scratch/yl12316/Opensplice-PNAS-data-analysis
 RUN_NAME=${RUN_NAME:-full_v3}
 EXPECTED_ROWS=${EXPECTED_ROWS:-250000}
-EPOCHS=${EPOCHS:-400}
+EPOCHS=${EPOCHS:-2000}
 FRESH=${FRESH:-0}
 
 cd "$REPO"
