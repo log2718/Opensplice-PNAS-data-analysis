@@ -247,3 +247,57 @@ class UpstreamExonModel(nn.Module):
             "n_trainable": sum(p.numel() for p in self.parameters()
                                if p.requires_grad),
         }
+
+
+class BiLSTMRegressor(nn.Module):
+    """Unconstrained BiLSTM control for the interpretable CNN.
+
+    Deliberately NOT interpretable: it exists to put a ceiling on how much
+    of the AlphaGenome response is learnable from B1 sequence at all, so the
+    CNN's R2 can be read as "close to the ceiling" or "leaving signal on the
+    table". Mean+max pooling over time feeds a small MLP head.
+
+    The signature matches UpstreamExonModel so the trainer's loop, metrics
+    and checkpointing need no special-casing.
+    """
+
+    def __init__(self, input_length: int = B1_LEN, *, hidden: int = 192,
+                 layers: int = 2, dropout: float = 0.2, head_hidden: int = 128,
+                 **_ignored):
+        super().__init__()
+        self.input_length = input_length
+        self.use_structure = False
+        self.head_kind = "mlp"
+        self.hidden, self.layers = hidden, layers
+        self.lstm = nn.LSTM(4, hidden, layers, batch_first=True,
+                            bidirectional=True,
+                            dropout=dropout if layers > 1 else 0.0)
+        self.head = nn.Sequential(
+            nn.Linear(4 * hidden, head_hidden), nn.ReLU(),
+            nn.Dropout(dropout), nn.Linear(head_hidden, 1))
+
+    def forward(self, x_seq, x_struct=None, x_wobble=None,
+                return_energy: bool = False):
+        o, _ = self.lstm(x_seq.transpose(1, 2))             # (N, L, 2H)
+        z = torch.cat([o.mean(dim=1), o.max(dim=1).values], dim=1)
+        y = self.head(z).squeeze(-1)
+        return (y, y) if return_energy else y
+
+    # --- trainer compatibility: no filters, no position biases ---
+    def l1_filters(self):
+        return torch.zeros((), device=next(self.parameters()).device)
+
+    def l2_position_smoothness(self):
+        return torch.zeros((), device=next(self.parameters()).device)
+
+    @torch.no_grad()
+    def calibrate_head_(self, x_seq, y, x_struct=None, x_wobble=None):
+        """Start the output bias at the target mean; the rest trains."""
+        self.head[-1].bias.fill_(float(torch.as_tensor(y).double().mean()))
+        return self
+
+    def describe(self) -> dict:
+        return {"arch": "bilstm", "input_length": self.input_length,
+                "hidden": self.hidden, "layers": self.layers,
+                "use_structure": False, "head": self.head_kind,
+                "n_params": sum(p.numel() for p in self.parameters())}

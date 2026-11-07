@@ -42,3 +42,7 @@ outputs/upstream_exon/dataset_v3/b1_primary_manifest.csv
 outputs/upstream_exon/dataset_v3/b1_*_ag_results.csv
 outputs/upstream_exon/dataset_v3/b1_*_failed.csv
 outputs/upstream_exon/dataset_v3/*.lock
+
+# Model run artifacts: per-row predictions are tens of MB (v3 is 69 MB).
+# Checkpoints, metrics, figures and the comparison tables stay tracked.
+outputs/upstream_exon/models/*/predictions.csv

@@ -1,0 +1,13 @@
+{
+  "run": "full_v3",
+  "epoch": 1504,
+  "split": "test",
+  "n_seqs": 4000,
+  "effective_coefficient": 0.04325015910253797,
+  "target_sd": 0.6451476993221387,
+  "total_prediction_sd": 0.5246269207933496,
+  "sum_per_filter_sd": 3.921903525593534,
+  "cancellation_ratio": 0.13376844110767705,
+  "median_pair_corr": -0.008914062100384024,
+  "n_pairs_corr_below_-0.5": 0
+}

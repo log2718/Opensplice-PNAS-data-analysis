@@ -44,7 +44,7 @@ import dataset_upstream as D  # noqa: E402
 # 21396228 before epoch 1 with ModuleNotFoundError: sklearn, and
 # --skip-baselines could not rescue it. Optional extras must never be
 # able to cost a training run.
-from model_upstream import UpstreamExonModel  # noqa: E402
+from model_upstream import BiLSTMRegressor, UpstreamExonModel  # noqa: E402
 
 OUT = ROOT / "outputs" / "upstream_exon"
 DATA = OUT / "dataset_v2"   # v2 is the current library; pass
@@ -379,6 +379,14 @@ def build_parser() -> argparse.ArgumentParser:
                    help="only with --head residual_tuner; off by default "
                         "because the original README advises against it")
 
+    a = ap.add_argument_group("architecture")
+    a.add_argument("--arch", choices=("cnn", "bilstm"), default="cnn",
+                   help="cnn: the interpretable PNAS model. bilstm: an "
+                        "unconstrained control that bounds what is learnable")
+    a.add_argument("--lstm-hidden", type=int, default=192)
+    a.add_argument("--lstm-layers", type=int, default=2)
+    a.add_argument("--lstm-dropout", type=float, default=0.2)
+
     o = ap.add_argument_group("optimization")
     o.add_argument("--epochs", type=int, default=300)
     o.add_argument("--batch-size", type=int, default=64)
@@ -389,6 +397,9 @@ def build_parser() -> argparse.ArgumentParser:
     o.add_argument("--loss", choices=["mse", "huber"], default="mse")
     o.add_argument("--huber-delta", type=float, default=1.0)
     o.add_argument("--patience", type=int, default=30)
+    o.add_argument("--lr-plateau", type=int, default=0,
+                   help="if >0, halve the LR after this many epochs without "
+                        "val improvement (off by default)")
     o.add_argument("--no-standardize-target", action="store_true",
                    help="train on raw logit units instead of z-scored "
                         "target (standardization is on by default)")
@@ -576,12 +587,18 @@ def main(argv=None) -> int:
             raise SystemExit(f"split {need!r} missing from the scored data")
 
     # ---- model ------------------------------------------------------
-    model = UpstreamExonModel(
-        input_length=args.input_length,
-        num_seq_filters=args.num_seq_filters,
-        use_structure=args.use_structure,
-        head=args.head,
-        use_batchnorm=args.batchnorm).to(device)
+    if args.arch == "bilstm":
+        model = BiLSTMRegressor(input_length=args.input_length,
+                                hidden=args.lstm_hidden,
+                                layers=args.lstm_layers,
+                                dropout=args.lstm_dropout).to(device)
+    else:
+        model = UpstreamExonModel(
+            input_length=args.input_length,
+            num_seq_filters=args.num_seq_filters,
+            use_structure=args.use_structure,
+            head=args.head,
+            use_batchnorm=args.batchnorm).to(device)
     logger.info("model: %s", model.describe())
 
     # One-shot affine head calibration so training starts near the target's
@@ -597,6 +614,9 @@ def main(argv=None) -> int:
                else nn.HuberLoss(delta=args.huber_delta))
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr,
                                  weight_decay=args.weight_decay)
+    sched = (torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, factor=0.5, patience=args.lr_plateau)
+        if args.lr_plateau else None)
 
     start_epoch, best_val, bad = 1, float("inf"), 0
     history: list[dict] = []
@@ -633,6 +653,8 @@ def main(argv=None) -> int:
                         "train_r2": tr["r2"], "val_loss": va["loss"],
                         "val_r2": va["r2"], "val_mae": va["mae"],
                         "val_pearson": va["pearson_r"]})
+        if sched is not None:
+            sched.step(va["loss"])
         improved = va["loss"] < best_val - 1e-9
         if improved:
             best_val, bad = va["loss"], 0
@@ -769,7 +791,7 @@ def main(argv=None) -> int:
     # so the table is never silently empty.
     for s in ("val", "test"):
         if s in results:
-            base_rows.append({"model": "UpstreamExonModel", "split": s,
+            base_rows.append({"model": type(model).__name__, "split": s,
                               **{k: v for k, v in results[s].items()
                                  if not k.startswith("pair_")}})
     base = pd.DataFrame(base_rows)
