@@ -35,6 +35,12 @@ def main() -> int:
     ap.add_argument("--split", default="test")
     ap.add_argument("--bins", type=int, default=160)
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--cmap", default="Blues",
+                    help="matplotlib colormap for the density")
+    ap.add_argument("--no-calibration", action="store_true",
+                    help="omit the binned conditional-mean overlay")
+    ap.add_argument("--marginals", action="store_true",
+                    help="add faint marginal histograms above and right")
     ap.add_argument("--clip", type=float, default=0.999,
                     help="central quantile span to plot (outliers still "
                          "counted in the stats, and reported)")
@@ -86,33 +92,63 @@ def main() -> int:
         print(f"note: {n - shown} of {n} points ({100 * (n - shown) / n:.2f}%) "
               f"fall outside the plotted range; all are included in the stats")
 
-    fig, ax = plt.subplots(figsize=(7.2, 6.6))
+    if args.marginals:
+        # Axes are placed explicitly: the main panel has to stay square while
+        # the marginals align to its edges, which tight_layout cannot promise.
+        fig = plt.figure(figsize=(7.6, 7.0))
+        ax = fig.add_axes([.10, .085, .645, .700])
+        ax_mx = fig.add_axes([.10, .792, .645, .105], sharex=ax)
+        ax_my = fig.add_axes([.752, .085, .082, .700], sharey=ax)
+        cax = fig.add_axes([.862, .085, .022, .700])
+    else:
+        fig, ax = plt.subplots(figsize=(7.2, 6.6))
+        ax_mx = ax_my = cax = None
+
     h = ax.hist2d(y, p, bins=args.bins, range=[lim, lim],
-                  norm=LogNorm(), cmap="viridis")
-    cb = fig.colorbar(h[3], ax=ax, pad=.02)
+                  norm=LogNorm(), cmap=args.cmap)
+    ax.set_facecolor("#f7fbff")
+    cb = (fig.colorbar(h[3], cax=cax) if cax is not None
+          else fig.colorbar(h[3], ax=ax, pad=.02))
     cb.set_label("sequences per bin (log scale)", fontsize=9)
 
-    ax.plot(lim, lim, color="#d62728", lw=1.1, ls="--", label="identity")
+    ax.plot(lim, lim, color="#d62728", lw=1.2, ls="--", label="identity")
 
-    # conditional mean of prediction given measurement
-    edges = np.linspace(*lim, N_CAL_BINS + 1)
-    idx = np.digitize(y, edges) - 1
-    ok = (idx >= 0) & (idx < N_CAL_BINS)
-    cx, cy = [], []
-    for b in range(N_CAL_BINS):
-        m = ok & (idx == b)
-        if m.sum() >= 25:
-            cx.append(.5 * (edges[b] + edges[b + 1]))
-            cy.append(p[m].mean())
-    ax.plot(cx, cy, color="#ffffff", lw=2.6, zorder=4)
-    ax.plot(cx, cy, color="#111111", lw=1.4, zorder=5,
-            label="binned mean prediction")
+    if not args.no_calibration:
+        # conditional mean of prediction given measurement
+        edges = np.linspace(*lim, N_CAL_BINS + 1)
+        idx = np.digitize(y, edges) - 1
+        ok = (idx >= 0) & (idx < N_CAL_BINS)
+        cx, cy = [], []
+        for b in range(N_CAL_BINS):
+            m = ok & (idx == b)
+            if m.sum() >= 25:
+                cx.append(.5 * (edges[b] + edges[b + 1]))
+                cy.append(p[m].mean())
+        ax.plot(cx, cy, color="#ffffff", lw=2.6, zorder=4)
+        ax.plot(cx, cy, color="#08306b", lw=1.6, zorder=5,
+                label="binned mean prediction")
 
-    ax.set_xlim(lim); ax.set_ylim(lim); ax.set_aspect("equal")
+    if args.marginals:
+        medges = np.linspace(*lim, args.bins + 1)
+        for a, v, orient in ((ax_mx, y, "vertical"),
+                             (ax_my, p, "horizontal")):
+            a.hist(v, bins=medges, orientation=orient,
+                   color="#9ecae1", ec="none", alpha=.6)
+            a.set_facecolor("none")
+            for s in a.spines.values():
+                s.set_visible(False)
+            a.tick_params(left=False, bottom=False,
+                          labelleft=False, labelbottom=False)
+        ax_mx.set_ylim(bottom=0)
+        ax_my.set_xlim(left=0)
+
+    ax.set_xlim(lim); ax.set_ylim(lim)
+    if not args.marginals:
+        ax.set_aspect("equal")
     ax.set_xlabel("measured AlphaGenome mean logit", fontsize=10)
     ax.set_ylabel("predicted AlphaGenome mean logit", fontsize=10)
-    ax.set_title(f"{args.run_dir.name} -- {args.split} "
-                 f"(n={n:,})", fontsize=11)
+    (ax_mx or ax).set_title(f"{args.run_dir.name} -- {args.split} "
+                            f"(n={n:,})", fontsize=11)
     ax.legend(loc="upper left", fontsize=8.5, framealpha=.9)
     ax.text(.985, .035,
             f"R² = {r2:+.4f}\nPearson r = {r:+.4f}\n"
@@ -123,7 +159,8 @@ def main() -> int:
 
     dest = args.out or args.run_dir / f"pred_vs_true_{args.split}.png"
     dest.parent.mkdir(parents=True, exist_ok=True)
-    fig.tight_layout()
+    if not args.marginals:
+        fig.tight_layout()
     fig.savefig(dest, dpi=200)
     print(f"wrote {dest}")
     return 0
