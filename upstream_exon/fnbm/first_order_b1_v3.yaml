@@ -1,0 +1,192 @@
+# First-order PositionalFactorizedNBM on the v3 upstream-exon library (block B1).
+#
+# Derived from Arush's configs/2026-11-alphagenome-splicing/first_order_psi.yaml.
+# His architecture, penalties and Muon settings are preserved verbatim; only the
+# task wiring changed. Every edit from his file is marked "# CHANGED" with why.
+#
+# The task is not PSI. The target is AlphaGenome's predicted splice-site
+# strength for a FIXED middle exon, as a function of the 113-nt upstream exon
+# body; nothing was measured in cells and the target is an unbounded logit, not
+# a fraction in [0, 1]. So the loss is plain MSE on the raw value.
+#
+# Scores to beat on the same 40,000-row test split:
+#   dinucleotide ridge  R2 0.3961      interpretable CNN  R2 0.6806
+#   6-mer ridge         R2 0.6716      BiLSTM (599k par)  R2 0.8199
+#
+# test_metrics.csv reports test_loss and test_pearson_r but no R2. With
+# loss: mse, test_loss IS the MSE in target units, so
+#     R2 = 1 - test_loss / var_pop(y_test)
+# and upstream_exon/score_fnbm_run.py does that against export_meta.json.
+
+run:
+  name: fnbm_o1_b1_v3
+  output_dir: /scratch/yl12316/results/upstream-exon-fnbm   # EDIT if your scratch differs
+  num_epochs: 100
+  checkpoint_every: 10
+  jobs_per_gpu: 1
+  seed: 0
+
+data:
+  # CHANGED: written by upstream_exon/export_fnbm_csv.py.
+  train_csv: /scratch/yl12316/data/b1_v3_fnbm/train.csv
+  # CHANGED: an explicit valid_csv, NOT valid_fraction. valid_fraction would
+  # carve a fresh random split out of train_csv per run.seed, so the number
+  # would stop being comparable to the CNN / ridge / BiLSTM runs, which all
+  # use this exact 10,000-row validation set.
+  valid_csv: /scratch/yl12316/data/b1_v3_fnbm/valid.csv
+  test_csv:  /scratch/yl12316/data/b1_v3_fnbm/test.csv
+  target_column: AG_mean_logit    # CHANGED from PSI: unbounded logit, not [0,1]
+  sequence_column: b1             # CHANGED from exon
+  # No flanks. B2-B8 and the middle exon are byte-identical across all 250,000
+  # rows, so a constant prefix/suffix would add nothing a filter could use.
+  batch_size: 128
+  num_workers: 2
+  pin_memory: true
+  persistent_workers: true
+
+training:
+  # CHANGED from logit_kl_divergence. That loss applies a sigmoid and needs a
+  # target in [0, 1]; ours ranges roughly 1.08 to 10.83. mse is already in his
+  # LOSSES registry and has no EVAL_TRANSFORMS entry, so the model output stays
+  # a raw scalar and test_loss comes out in target units.
+  loss: mse
+  loss_kwargs: {}
+  optimizer: muon
+  # Adam group.
+  init_lr: 0.001
+  min_lr: 1.0e-08
+  weight_decay: 0.0
+  # Muon group.
+  muon_init_lr: 0.001
+  muon_min_lr: 1.0e-08
+  muon_momentum: 0.95
+  muon_weight_decay: 0.014925284855736602
+  lr_scheme: cosine_warm_restarts
+  lr_warmup_steps: 2000
+  lr_restart_period: 11
+  lr_restart_mult: 1
+  lr_decay_factor: 0.5
+  lr_decay_patience: 10
+  early_stopping_patience: 22
+  grad_accum_steps: 2             # effective batch 256
+  gradient_clip: null
+  amp: false
+
+model:
+  class: PositionalFactorizedNBM
+  file: /scratch/yl12316/factorized-model-iterations/models/fnbm/positional_model.py  # EDIT: your checkout
+  kwargs:
+    orders: [[1, null]]
+    order_start_epoch: {'1': 0}
+    input_length: 113             # CHANGED from 70: the B1 block length
+    sequence_channels: 4
+    sequence_kernels: [[64, 7]]
+    padding: same
+    pooling: null
+    pooling_size: null
+    conv_activation: relu
+    conv_batch_norm: false
+    filter_transform_type: basis
+    filter_transform_hidden_num: 1
+    filter_transform_hidden_size: 32
+    filter_transform_activation: gelu
+    filter_transform_norm: none
+    positional_hidden_num: 2
+    positional_hidden_size: 64
+    positional_activation: relu
+    positional_norm: none
+    position_num_fourier: 8
+    # 200 > input_length 113, as his comment requires. Left alone.
+    position_fourier_max_period: 200.0
+    position_fourier_min_period: 5.0
+    disable_tuner: false
+    tuner_residual: true
+    tuner_hidden_num: 2
+    tuner_hidden_size: 64
+    tuner_hidden_activation: relu
+    tuner_hidden_norm: none
+    output_size: 1
+    output_activations: [none]
+    conv_kernel_l2_penalty: 0.0001
+    feature_nn_weight_l2_penalty: 1.0e-05
+    positional_feature_l2_penalty: 0.001
+    positional_kernel_smoothness_penalty: 0.0001
+    magnitude_l2_penalty: 0.0
+    first_order_contribution_l1_penalty: 0.0
+    tuner_l2_penalty: 0.0
+
+log_extra:
+  grad_norm: true
+  reg_penalties: true
+
+wandb:
+  enabled: false
+  project: alphagenome-splicing
+  entity: null
+  tags: ["first-order", "positional", "muon", "upstream-exon", "b1-v3"]
+
+interpret:
+  every_k_epochs: 20
+  final_report_kwargs:
+    output_idx: 0
+    max_batches: 100
+    kmer_source: validation
+    num_sequences: 500000
+    batch_size: 2048
+    seed: 42
+    pwm_top_frac: 0.2
+    interaction_top_k: 12
+    length_normalize: true
+    n_points: 500
+    dedup_top_k: 25
+    dedup_ncols: 3
+    run_tuner: true
+    run_validation: true
+    run_dedup: true
+    run_ablation: true
+    ablation_mode: shuffle
+    ablation_seed: 0
+    run_submission: false
+    dedup_kwargs: &dedup
+      # Unchanged. B1 is exon body, so like his PSI exons it is single-stranded
+      # transcript sequence (written with T), and reverse-complement merging
+      # stays off.
+      alphabet_mode: RNA
+      reverse_complement: false
+      grouping: correlation
+      correlation_min: 0.5
+      max_batches: 50
+      eps_dead: 1.0e-03
+      ic_min: 2.0
+      ic_pos: 0.25
+      gauge_quantile: 99.9
+      sign_tol: 1.0e-06
+      occurrence_samples: 2000
+      strength_lag_radius: null
+      kmer_seed: 42
+      scan_batch_size: 2048
+      p_max: 0.01
+      coherence_min: 0.8
+  hooks:
+    - enabled: true
+      file: /scratch/yl12316/factorized-model-iterations/hooks/fnbm_standard_interpret.py  # EDIT: your checkout
+      function: run_interpretation
+      kwargs:
+        output_idx: 0
+        max_batches: 50
+        kmer_source: validation
+        num_sequences: 500000
+        batch_size: 2048
+        seed: 42
+        pwm_top_frac: 0.2
+        interaction_top_k: 12
+        length_normalize: true
+        n_points: 500
+        dedup_top_k: 25
+        dedup_ncols: 3
+        run_tuner: true
+        run_validation: true
+        run_dedup: true
+        run_ablation: false
+        run_submission: false
+        dedup_kwargs: *dedup
