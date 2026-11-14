@@ -57,6 +57,12 @@ SEED=${SEED:-0}
 # test pass) in minutes. Leave both empty for a real run.
 EPOCHS=${EPOCHS:-}
 SUBSAMPLE=${SUBSAMPLE:-}
+# Triton's first kernel launch JIT-compiles cuda_utils.so with gcc, which needs
+# the CUDA headers and libcuda stub his singularity image provides and bare
+# metal here does not. Default 1 routes through our wrapper, which flips his
+# own use_kernels switch to the plain-PyTorch reference. Set NO_TRITON=0 to
+# use his kernels (only inside a CUDA devel container).
+NO_TRITON=${NO_TRITON:-1}
 # A venv layered over the cluster's CUDA torch: it adds pandas, scikit-learn,
 # scipy, matplotlib, seaborn and logomaker without writing into the base env,
 # and reaches torch through a .pth pointing at that env's site-packages.
@@ -95,7 +101,21 @@ if not torch.cuda.is_available():
              "singularity overlay Arush's jobs/alphagenome_splicing/train.sbatch uses.")
 print(torch.cuda.get_device_name(0))
 
-missing = [m for m in ("numpy", "pandas", "yaml", "sklearn", "tqdm", "pyarrow")
+# Informational: does Triton's driver initialise? Touching driver.active.utils
+# forces the cuda_utils.so JIT build that killed jobs 22861921/22861922. This
+# never fails the job -- NO_TRITON=1 routes around it.
+try:
+    from triton.runtime import driver
+    _ = driver.active.utils
+    print("triton: usable (NO_TRITON=0 would run his kernels)")
+except Exception as exc:
+    print(f"triton: unusable ({type(exc).__name__}) -- expected on bare metal; "
+          f"NO_TRITON=1 uses the PyTorch reference")
+
+# pyarrow is in his pyproject.toml but is NOT needed here: data/loaders.py
+# only reaches read_parquet for a .parquet input, and the two hooks that read
+# parquet are the simulation ones, which this config does not enable.
+missing = [m for m in ("numpy", "pandas", "yaml", "sklearn", "tqdm")
            if not importlib.util.find_spec(m)]
 if missing:
     sys.exit(f"FATAL: training needs {missing}")
@@ -162,7 +182,12 @@ fi
 
 export PYTHONUNBUFFERED=1
 cd "$FNBM_REPO"
-srun "$PYTHON_BIN" train.py "$CELL"
+if [[ "$NO_TRITON" == "1" ]]; then
+    srun "$PYTHON_BIN" "$REPO/upstream_exon/fnbm/train_reference_kernels.py" \
+        "$FNBM_REPO" "$CELL"
+else
+    srun "$PYTHON_BIN" train.py "$CELL"
+fi
 
 echo "done -> $RUN_DIR"
 "$PYTHON_BIN" "$REPO/upstream_exon/score_fnbm_run.py" \
