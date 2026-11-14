@@ -120,7 +120,10 @@ missing = [m for m in ("numpy", "pandas", "yaml", "sklearn", "tqdm")
 if missing:
     sys.exit(f"FATAL: training needs {missing}")
 
-interp = [m for m in ("matplotlib", "seaborn", "logomaker", "scipy", "plotly")
+# plotly is NOT in this list: only sweep_analysis/charts.py imports it, and
+# ingest.py never pulls that in. Job 23090681 ran interpretation to completion
+# with plotly absent.
+interp = [m for m in ("matplotlib", "seaborn", "logomaker", "scipy")
           if not importlib.util.find_spec(m)]
 if interp:
     print(f"WARNING: interpretation will be SKIPPED silently -- missing {interp}. "
