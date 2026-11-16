@@ -49,3 +49,18 @@ outputs/upstream_exon/models/*/predictions.csv
 
 # Shareable dataset exports: derived from dataset_v3, tens of MB.
 outputs/upstream_exon/b1_v3_upstream_exon_250k.csv*
+
+# Transport tarball for the FNBM figures; the extracted PNGs are tracked.
+outputs/fnbm_figs.tgz
+
+# Full-context (ExonSkip7_Lib2) libraries: the upstream manifest is ~120 MB,
+# the middle ~45 MB, and the label CSVs grow to a few hundred MB. Manifests
+# are NOT committed because they are reproducible from the seed alone:
+#     python upstream_exon/build_fullctx_library.py --library upstream
+#     python upstream_exon/build_fullctx_library.py --library middle
+# manifest_fingerprint.json IS committed and proves a rebuilt manifest is
+# byte-identical to the one that was labeled.
+outputs/upstream_exon/fullctx_*/manifest.csv
+outputs/upstream_exon/fullctx_*/ag_results.csv
+outputs/upstream_exon/fullctx_*/ag_failed.csv
+outputs/upstream_exon/fullctx_*/*.lock

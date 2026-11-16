@@ -1,0 +1,69 @@
+===== SPLICE_JUNCTIONS =====
+prediction: alphagenome.models.dna_output.Output
+  public attrs: ['atac', 'cage', 'chip_histone', 'chip_tf', 'contact_maps', 'dnase', 'filter_ontology_terms', 'filter_output_type', 'filter_to_strand', 'get', 'map_track_data', 'procap', 'resize', 'rna_seq', 'splice_junctions', 'splice_site_usage', 'splice_sites']
+  .atac: builtins.NoneType
+    value: None
+  .cage: builtins.NoneType
+    value: None
+  .chip_histone: builtins.NoneType
+    value: None
+  .chip_tf: builtins.NoneType
+    value: None
+  .contact_maps: builtins.NoneType
+    value: None
+  .dnase: builtins.NoneType
+    value: None
+  .procap: builtins.NoneType
+    value: None
+  .rna_seq: builtins.NoneType
+    value: None
+  .splice_junctions: alphagenome.data.junction_data.JunctionData
+    public attrs: ['filter_by_name', 'filter_by_ontology', 'filter_by_tissue', 'filter_to_negative_strand', 'filter_to_positive_strand', 'filter_to_strand', 'filter_tracks', 'intersect_with_interval', 'interval', 'junctions', 'metadata', 'names', 'normalize_values', 'num_tracks', 'ontology_terms', 'possible_strands', 'strands', 'uns', 'values']
+    .interval: builtins.NoneType
+      value: None
+    .junctions: numpy.ndarray
+      ndarray shape=(11,) dtype=object
+      first values: [Interval(chromosome='', start=7615, end=7780, strand='+', name='')
+ Interval(chromosome='', start=7615, end=8434, strand='+', name='')
+ Interval(chromosome='', start=7615, end=8705, strand='+', name='')
+ Interval(chromosome='', start=7637, end=7780, strand='+', name='')
+ Interval(chromosome='', start=7637, end=8434, strand='+', name='')
+ Interval(chromosome='', start=7637, end=8705, strand='+', name='')
+ Interval(chromosome='', start=7653, end=7780, strand='+', name='')
+ Interval(chromosome='', start=7653, end=8434, strand='+', name='')]
+    .metadata: pandas.DataFrame
+      DataFrame shape=(1, 8)
+      columns: ['name', 'ontology_curie', 'biosample_name', 'biosample_type', 'biosample_life_stage', 'gtex_tissue', 'data_source', 'Assay title']
+      head:
+                                name ontology_curie          biosample_name biosample_type biosample_life_stage gtex_tissue data_source    Assay title
+0  junction_CL:0002518 total RNA-seq     CL:0002518  kidney epithelial cell   primary_cell    embryonic,newborn                  encode  total RNA-seq
+    .names: pandas.arrays.ArrowStringArray
+      public attrs: ['T', 'all', 'any', 'argmax', 'argmin', 'argsort', 'astype', 'copy', 'delete', 'dropna', 'dtype', 'duplicated', 'equals', 'factorize', 'fillna', 'insert', 'interpolate', 'isin', 'isna', 'item', 'map', 'nbytes', 'ndim', 'ravel', 'repeat', 'reshape', 'round', 'searchsorted', 'shape', 'shift', 'size', 'take', 'to_numpy', 'tolist', 'transpose', 'unique', 'value_counts', 'view']
+      .T: pandas.arrays.ArrowStringArray
+      .dtype: pandas.StringDtype
+      .nbytes: builtins.int
+        value: 41
+      .ndim: builtins.int
+        value: 1
+      .shape: builtins.tuple
+      .size: numpy.int64
+    .num_tracks: builtins.int
+      value: 1
+    .ontology_terms: builtins.list
+      public attrs: ['append', 'clear', 'copy', 'count', 'extend', 'index', 'insert', 'pop', 'remove', 'reverse', 'sort']
+    .possible_strands: numpy.ndarray
+      ndarray shape=(1,) dtype=<U1
+      first values: ['+']
+    .strands: numpy.ndarray
+      ndarray shape=(11,) dtype=<U1
+      first values: ['+' '+' '+' '+' '+' '+' '+' '+']
+    .uns: builtins.NoneType
+      value: None
+    .values: numpy.ndarray
+      ndarray shape=(11, 1) dtype=float32
+      first values: [4.3854761e-04 1.0370522e-04 1.4800244e-04 4.5520149e-04 9.5009425e-05
+ 1.1785622e-04 5.6013172e-03 1.0116843e-04]
+  .splice_site_usage: builtins.NoneType
+    value: None
+  .splice_sites: builtins.NoneType
+    value: None

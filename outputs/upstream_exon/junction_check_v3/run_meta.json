@@ -1,0 +1,15 @@
+{
+  "split": "test",
+  "n_requested": 3000,
+  "seed": 0,
+  "calls_this_run": 3000,
+  "ontology": [
+    "CL:0002518"
+  ],
+  "b1_span": [
+    0,
+    113
+  ],
+  "designed_start": 116,
+  "middle_acceptor": 243
+}
