@@ -46,6 +46,10 @@ for _p in (str(_THIS_DIR), str(ROOT / "analysis_script")):
 import fullctx_lib as F  # noqa: E402
 
 OUT = ROOT / "outputs" / "upstream_exon" / "fullctx_probe"
+
+#: track indices matching the target ontology, filled in from the
+#: built-in TrackMetadataCatalog once it is loaded
+ONTOLOGY_IDX: list[int] = []
 DEFAULT_WEIGHTS = Path("/scratch/yl12316/models/alphagenome/"
                        "model_all_folds.safetensors")
 TARGET_ONTOLOGY = "CL:0002518"
@@ -359,6 +363,91 @@ def main() -> int:
     for line in walk(out, "out"):
         print(line)
 
+    # ---- the built-in track metadata catalog -----------------------------
+    # The first run failed named_outputs=True with "requires a metadata
+    # catalog"; the catalog ships with the package but is not a loose CSV,
+    # and the earlier grep missed it because ontology ids are written
+    # CL_0002518 (underscore), not CL:0002518.
+    print("\n--- TrackMetadataCatalog.load_builtin() ---")
+    catalog = None
+    try:
+        from alphagenome_pytorch.named_outputs import TrackMetadataCatalog
+        for kw in ({}, {"organism": args.organism_index}, {"organism": 0}):
+            try:
+                catalog = TrackMetadataCatalog.load_builtin(**kw)
+                print(f"  load_builtin({kw}) -> OK: {type(catalog).__name__}")
+                break
+            except Exception as e:                          # noqa: BLE001
+                print(f"  load_builtin({kw}) -> {type(e).__name__}: {e}")
+    except Exception as e:                                  # noqa: BLE001
+        print(f"  import failed: {type(e).__name__}: {e}")
+
+    if catalog is not None:
+        print(f"  members: {[a for a in dir(catalog) if not a.startswith('_')]}")
+        for attr in ("tracks", "by_output", "outputs", "metadata", "entries",
+                     "catalog", "table"):
+            v = getattr(catalog, attr, None)
+            if v is None or callable(v):
+                continue
+            try:
+                print(f"  {attr}: {type(v).__name__} len={len(v)}")
+                if isinstance(v, dict):
+                    print(f"    keys: {list(v)[:15]}")
+            except Exception:                               # noqa: BLE001
+                pass
+        # try to pull the splice_site_usage track list out of it
+        rows = None
+        for getter in ("get", "tracks_for", "for_output", "__getitem__"):
+            fn = getattr(catalog, getter, None)
+            if not callable(fn):
+                continue
+            try:
+                rows = fn("splice_site_usage")
+                print(f"  {getter}('splice_site_usage') -> "
+                      f"{type(rows).__name__} len={len(rows)}")
+                break
+            except Exception:                               # noqa: BLE001
+                rows = None
+        if rows is None:
+            for attr in ("tracks", "by_output", "outputs", "metadata"):
+                v = getattr(catalog, attr, None)
+                if isinstance(v, dict) and "splice_site_usage" in v:
+                    rows = v["splice_site_usage"]
+                    print(f"  {attr}['splice_site_usage'] -> len={len(rows)}")
+                    break
+        if rows is not None:
+            try:
+                r0 = list(rows)[0]
+                print(f"  first track: {r0}")
+                flds = [f for f in dir(r0) if not f.startswith('_')
+                        and not callable(getattr(r0, f, None))]
+                print(f"  track fields: {flds}")
+            except Exception as e:                          # noqa: BLE001
+                print(f"  could not inspect a row: {e}")
+            # the actual lookup, tolerant of ':' vs '_'
+            wants = {args.ontology, args.ontology.replace(":", "_")}
+            hits = []
+            for i, r in enumerate(rows):
+                blob = str(r)
+                if any(w in blob for w in wants):
+                    hits.append(i)
+            print(f"\n  tracks matching {sorted(wants)}: {hits[:20]} "
+                  f"({len(hits)} of {len(rows)})")
+            for i in hits[:6]:
+                print(f"    [{i}] {list(rows)[i]}")
+            if hits:
+                ONTOLOGY_IDX.extend(hits)
+
+        for setter in ("set_track_metadata_catalog", "set_catalog"):
+            fn = getattr(model, setter, None)
+            if callable(fn):
+                try:
+                    fn(catalog)
+                    print(f"  model.{setter}(catalog) -> OK")
+                    break
+                except Exception as e:                      # noqa: BLE001
+                    print(f"  model.{setter} -> {type(e).__name__}: {e}")
+
     named = None
     print("\n--- predict(named_outputs=True) ---", flush=True)
     try:
@@ -443,13 +532,52 @@ def main() -> int:
               "printed above are the ground truth -- tell me which one holds "
               "the usage head and I will wire that name in.")
         return 1
-    if isinstance(usage, dict):
-        print(f"\n  splice_site_usage is a dict with keys {list(usage)}")
-        for k in ("1bp", "1", "preds", "pred", "values"):
-            if k in usage:
-                usage = usage[k]
-                print(f"  -> using ['{k}']")
-                break
+    def pick_tensor(obj, path="splice_site_usage", depth=0):
+        """The tensor inside however many layers of dict the head returns.
+
+        Guessing key names failed once already ('1bp'/'preds'/... matched
+        nothing), so prefer a tensor whose shape actually contains the input
+        length, and otherwise take the largest tensor present -- then SAY
+        which was chosen, so a wrong pick is visible rather than silent.
+        """
+        import torch as _t
+        if isinstance(obj, _t.Tensor):
+            return obj, path
+        if isinstance(obj, (list, tuple)) and obj:
+            return pick_tensor(obj[0], f"{path}[0]", depth + 1)
+        if isinstance(obj, dict):
+            print(f"  {path} is a dict with keys {list(obj)}")
+            if depth > 3:
+                return None, path
+            # 'predictions' holds probabilities in [0,1]; 'logits' is the
+            # same shape and would pass every check below while silently
+            # feeding logit_average the wrong scale. Order matters.
+            for pref in ("predictions", "probs", "probabilities"):
+                if pref in obj:
+                    print(f"  -> preferring ['{pref}'] over {list(obj)}")
+                    return pick_tensor(obj[pref], f"{path}[{pref!r}]",
+                                       depth + 1)
+            best = None
+            for k, v in obj.items():
+                if k == "logits" and len(obj) > 1:
+                    continue      # only fall back to logits if nothing else
+                t, p = pick_tensor(v, f"{path}[{k!r}]", depth + 1)
+                if t is None:
+                    continue
+                if F.TARGET_LEN in tuple(t.shape):
+                    return t, p            # exact input-length match wins
+                if best is None or t.numel() > best[0].numel():
+                    best = (t, p)
+            return best if best else (None, path)
+        return None, path
+
+    usage, upath = pick_tensor(usage)
+    if usage is None:
+        print("\nFATAL: could not find a tensor under 'splice_site_usage'. "
+              "The keys printed above are the ground truth -- tell me which "
+              "one holds the per-base usage and I will wire that name in.")
+        return 1
+    print(f"  -> using {upath}  shape {tuple(usage.shape)}")
     u = usage.detach().float().cpu().numpy()
     print(f"\n  usage tensor {u.shape}")
     u = u[0] if u.ndim == 3 else u
@@ -484,6 +612,10 @@ def main() -> int:
                   f"{len(hit)} match -> indices {hit[:10]}")
             print(m.iloc[hit].head(6).to_string())
             break
+    if not idxs and ONTOLOGY_IDX:
+        idxs = list(ONTOLOGY_IDX)
+        meta_src = "TrackMetadataCatalog.load_builtin()"
+        print(f"  using the built-in catalog: indices {idxs[:10]}")
     if not idxs:
         print(f"  no shipped table of length {n_tracks} mentions "
               f"{args.ontology}.")
@@ -498,7 +630,9 @@ def main() -> int:
         "acceptor_padded": acc_pos, "donor_padded": don_pos,
         "ontology": args.ontology,
         "ontology_track_indices": [int(i) for i in idxs],
-        "metadata_source": str(meta_src.relative_to(sp)) if meta_src else None,
+        "metadata_source": (meta_src if isinstance(meta_src, str)
+                            else (str(meta_src.relative_to(sp))
+                                  if meta_src else None)),
     }
 
     # ---- read the metric -------------------------------------------------
