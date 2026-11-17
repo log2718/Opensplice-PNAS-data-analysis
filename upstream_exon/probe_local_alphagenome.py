@@ -283,6 +283,36 @@ def main() -> int:
 
     describe_named_outputs(sp, None)
 
+    # The package was installed as alphagenome-pytorch[hf] with
+    # huggingface_hub, so the track metadata may be fetched from the Hub
+    # rather than shipped -- which would explain finding nothing above. Any
+    # such file is cached on disk, and compute nodes may have no outbound
+    # network, so what is already cached is what we get.
+    print("\n--- huggingface cache ---")
+    import os
+    for var in ("HF_HOME", "HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE",
+                "HF_HUB_OFFLINE", "TRANSFORMERS_CACHE"):
+        if os.environ.get(var):
+            print(f"  {var}={os.environ[var]}")
+    cands = [Path(os.environ.get("HF_HOME", "")) / "hub" if os.environ.get("HF_HOME") else None,
+             Path(os.environ.get("HF_HUB_CACHE", "")) if os.environ.get("HF_HUB_CACHE") else None,
+             Path.home() / ".cache" / "huggingface" / "hub",
+             Path("/scratch/yl12316/.cache/huggingface/hub"),
+             Path("/scratch/yl12316/models/alphagenome/.cache")]
+    seen_any = False
+    for c in cands:
+        if c is None or not c.exists():
+            continue
+        seen_any = True
+        print(f"  {c}:")
+        for f in sorted(c.rglob("*"))[:200]:
+            if f.is_file() and f.suffix.lower() in (
+                    ".csv", ".tsv", ".json", ".parquet", ".txt", ".yaml", ".yml"):
+                print(f"    {f.stat().st_size / 1e3:9.1f} kB  "
+                      f"{f.relative_to(c)}")
+    if not seen_any:
+        print("  (no cache directory found at the usual locations)")
+
     # the native construct, so the number is comparable to the API probe
     import splice_site_partition as SP
     exons = pd.read_csv(ROOT / "outputs" / "upstream_exon" / "b1_pilot_exons.csv")
