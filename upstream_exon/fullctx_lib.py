@@ -266,6 +266,33 @@ def padded_positions(context_len: int = CONTEXT_LEN,
             left_pad + GEOMETRY["donor"])
 
 
+def clean_seq(seq: str) -> str:
+    """Upper-case; anything outside ACGTN becomes N.
+
+    Byte-identical to ``alphagenome_local_prediction_pipeline_minigene``'s
+    version, reimplemented here so the LOCAL backend never has to import the
+    API pipeline -- that module imports ``dotenv`` at module scope purely to
+    read an API key, which a local-weights run has no use for and which is not
+    installed in the alphagenome env. ``test_fullctx.py`` asserts the two
+    agree whenever the API module is importable.
+    """
+    seq = str(seq).upper()
+    return "".join(b if b in {"A", "C", "G", "T", "N"} else "N" for b in seq)
+
+
+def center_pad(core_seq: str, target_len: int = TARGET_LEN,
+               pad_base: str = "N") -> tuple[str, int, int]:
+    """Centre a construct in a fixed-length input. See ``clean_seq``."""
+    core_seq = clean_seq(core_seq)
+    if len(core_seq) > target_len:
+        raise ValueError(
+            f"Construct length {len(core_seq)} exceeds target length "
+            f"{target_len}.")
+    left_pad = (target_len - len(core_seq)) // 2
+    right_pad = target_len - len(core_seq) - left_pad
+    return pad_base * left_pad + core_seq + pad_base * right_pad, left_pad, right_pad
+
+
 # ==========================================================================
 # the metric
 # ==========================================================================
@@ -372,10 +399,12 @@ def score_construct(model, seq: str, *, ontology_terms=ONTOLOGY,
     metrics can be compared without spending a second call. That costs nothing
     in calls but makes each response larger.
     """
-    import alphagenome_local_prediction_pipeline_minigene as ag
     from alphagenome.models import dna_client
 
-    padded, left_pad, _ = ag.center_pad(ag.clean_seq(seq), target_len=TARGET_LEN)
+    # Our own center_pad, not the API pipeline's: that module imports dotenv
+    # at module scope for an API key, which the local backend has no use for.
+    # The two are verified byte-identical by test_fullctx.py.
+    padded, left_pad, _ = center_pad(seq, target_len=TARGET_LEN)
     acc_pos = left_pad + GEOMETRY["acceptor"]
     don_pos = left_pad + GEOMETRY["donor"]
 
@@ -404,6 +433,7 @@ def score_construct(model, seq: str, *, ontology_terms=ONTOLOGY,
         "logit_average": logit_average(u_acc, u_don),
     }
     if also_splice_sites:
+        import alphagenome_local_prediction_pipeline_minigene as ag
         d_t, a_t = ag.get_positive_strand_tracks(pred)
         p_acc, p_don = float(a_t[acc_pos]), float(d_t[don_pos])
         rec.update({

@@ -141,12 +141,70 @@ def walk(obj, name: str, depth: int = 0, max_depth: int = 4,
 
 def hunt_metadata(sp: Path) -> list[Path]:
     """Any metadata table shipped inside the installed package."""
-    pats = ("*.csv", "*.tsv", "*.parquet", "*.json", "*.txt")
+    pats = ("*.csv", "*.tsv", "*.parquet", "*.json", "*.txt", "*.npy", "*.npz")
     hits: list[Path] = []
     for p in pats:
         hits += [f for f in sp.rglob(p)
                  if "__pycache__" not in str(f) and f.stat().st_size > 200]
     return sorted(hits, key=lambda f: -f.stat().st_size)[:25]
+
+
+def grep_ontology(sp: Path, term: str, max_hits: int = 12) -> list[str]:
+    """Which files in the installed package mention the ontology at all.
+
+    The first probe found no shipped CSV/JSON, so the 734-track ordering is
+    not a data file. It is then either embedded in Python, produced by
+    ``named_outputs``, or fetched at run time -- and a plain text search over
+    the package says which.
+    """
+    out: list[str] = []
+    for f in sp.rglob("*"):
+        if not f.is_file() or "__pycache__" in str(f):
+            continue
+        if f.stat().st_size > 50_000_000:
+            continue
+        try:
+            txt = f.read_text(errors="ignore")
+        except Exception:                                   # noqa: BLE001
+            continue
+        if term in txt:
+            n = txt.count(term)
+            out.append(f"{f.relative_to(sp)}  ({n} occurrence(s))")
+            if len(out) >= max_hits:
+                break
+    return out
+
+
+def describe_named_outputs(sp: Path, n_tracks: int | None) -> None:
+    """What the package's own metadata machinery exposes."""
+    import importlib
+    print("\n--- alphagenome_pytorch.named_outputs ---")
+    try:
+        N = importlib.import_module("alphagenome_pytorch.named_outputs")
+    except Exception as e:                                  # noqa: BLE001
+        print(f"  not importable: {type(e).__name__}: {e}")
+        return
+    names = [a for a in dir(N) if not a.startswith("_")]
+    print(f"  members: {names}")
+    for a in names:
+        try:
+            v = getattr(N, a)
+        except Exception:                                   # noqa: BLE001
+            continue
+        # anything sized like the track axis is a strong candidate
+        try:
+            ln = len(v)
+        except Exception:                                   # noqa: BLE001
+            continue
+        if n_tracks and ln == n_tracks:
+            print(f"  *** {a}: len == n_tracks ({ln}) -- likely the "
+                  f"track table")
+            try:
+                print(f"      first 3: {list(v)[:3]}")
+            except Exception:                               # noqa: BLE001
+                pass
+        elif ln in (5, 734, 768, 256, 384, 640):
+            print(f"  {a}: len {ln}")
 
 
 def find_ontology_tracks(meta, ontology: str) -> list[int]:
@@ -201,8 +259,29 @@ def main() -> int:
     print(f"  one-hot  {onehot_name or 'NOT FOUND -> using manual ACGT/N=0'}")
 
     print("\n--- metadata tables shipped with the package ---")
-    for f in hunt_metadata(sp):
+    tables = hunt_metadata(sp)
+    for f in tables:
         print(f"  {f.stat().st_size / 1e3:9.1f} kB  {f.relative_to(sp)}")
+    if not tables:
+        print("  (none found)")
+
+    print(f"\n--- files mentioning {args.ontology} ---")
+    hits = grep_ontology(sp, args.ontology)
+    for h in hits:
+        print(f"  {h}")
+    if not hits:
+        print(f"  (none -- {args.ontology} does not appear anywhere in the "
+              f"installed package)")
+        generic = grep_ontology(sp, "CL:", max_hits=8)
+        print("  files mentioning any 'CL:' ontology term:")
+        for h in generic:
+            print(f"    {h}")
+        if not generic:
+            print("    (none -- the track ordering is not shipped as text; "
+                  "it must come from named_outputs, the checkpoint, or the "
+                  "API's output_metadata)")
+
+    describe_named_outputs(sp, None)
 
     # the native construct, so the number is comparable to the API probe
     import splice_site_partition as SP
@@ -214,8 +293,9 @@ def main() -> int:
     if fails:
         sys.exit(f"FATAL: native construct failed validation: {fails}")
 
-    import alphagenome_local_prediction_pipeline_minigene as ag
-    padded, lp, _ = ag.center_pad(ag.clean_seq(core), target_len=F.TARGET_LEN)
+    # F.center_pad, not the API pipeline's: that module needs dotenv, which
+    # the alphagenome env does not have and a local run does not want.
+    padded, lp, _ = F.center_pad(core, target_len=F.TARGET_LEN)
     assert lp == left_pad and len(padded) == F.TARGET_LEN
     print(f"\n  native construct built and validated "
           f"({len(padded):,} nt, {padded.count('N')} N)")
@@ -259,6 +339,62 @@ def main() -> int:
             print(line)
     except Exception as e:                                  # noqa: BLE001
         print(f"  named_outputs=True raised {type(e).__name__}: {e}")
+
+    # Does the NamedOutputs object itself carry the ontology labels?
+    if named is not None:
+        print(f"\n--- hunting {args.ontology} inside NamedOutputs ---")
+        found = False
+
+        def scan(o, path="named", depth=0):
+            nonlocal found
+            if depth > 5 or found:
+                return
+            if isinstance(o, str):
+                if args.ontology in o:
+                    print(f"  HIT at {path}: {o[:120]}")
+                    found = True
+                return
+            if isinstance(o, dict):
+                for k, v in list(o.items())[:64]:
+                    scan(v, f"{path}[{k!r}]", depth + 1)
+                return
+            if isinstance(o, (list, tuple)):
+                hits = [i for i, v in enumerate(o[:2000])
+                        if isinstance(v, str) and args.ontology in v]
+                if hits:
+                    print(f"  HIT at {path}: indices {hits[:10]} of "
+                          f"{len(o)} entries")
+                    print(f"       e.g. {o[hits[0]]!r}")
+                    found = True
+                    return
+                for i, v in enumerate(o[:8]):
+                    scan(v, f"{path}[{i}]", depth + 1)
+                return
+            if hasattr(o, "__dict__"):
+                for k, v in list(vars(o).items())[:64]:
+                    scan(v, f"{path}.{k}", depth + 1)
+
+        try:
+            scan(named)
+        except Exception as e:                              # noqa: BLE001
+            print(f"  scan raised {type(e).__name__}: {e}")
+        if not found:
+            print(f"  {args.ontology} not present in NamedOutputs")
+
+    # safetensors files carry a free-form __metadata__ header; the track
+    # ordering may have been stashed there at conversion time.
+    print("\n--- safetensors header metadata ---")
+    try:
+        from safetensors import safe_open
+        with safe_open(str(args.weights), framework="pt") as f:
+            md = f.metadata() or {}
+        if md:
+            for k, v in list(md.items())[:20]:
+                print(f"  {k}: {str(v)[:160]}")
+        else:
+            print("  (empty)")
+    except Exception as e:                                  # noqa: BLE001
+        print(f"  unavailable: {type(e).__name__}: {e}")
 
     # ---- locate the usage tensor -----------------------------------------
     def dig(o, key):
