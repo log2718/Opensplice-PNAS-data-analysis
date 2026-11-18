@@ -100,6 +100,78 @@ ONTOLOGY = ("CL:0002518",)
 #: the middle exon held fixed while B1 varies, as in v1-v3
 PRIMARY_EXON = "syn_a5.0_00482"
 
+# --------------------------------------------------------------------------
+# local-backend track selection
+# --------------------------------------------------------------------------
+# The local port's SPLICE_SITE_USAGE head emits all 734 tracks with no
+# ontology_terms argument, so the CL:0002518 track is selected by index.
+# Resolved 2026-11-17 from the 0.3.1 track catalogue (see CATALOG_SHA256):
+#
+#   idx  track_name                      strand  biosample              source
+#    71  usage_CL:0002518 total RNA-seq     +     kidney epithelial cell  encode
+#   438  usage_CL:0002518 total RNA-seq     -     kidney epithelial cell  encode
+#
+# 438 - 71 == 367 == 734/2, i.e. the head is [367 plus][367 minus]. The
+# construct is built 5'->3' as given, so the PLUS track is the right one.
+#: plus-strand CL:0002518 index on the 734-track axis -- the one we score
+USAGE_TRACK_PLUS = 71
+#: minus-strand twin, scored only as a preflight contrast (must be lower)
+USAGE_TRACK_MINUS = 438
+
+#: track catalogue, fetched from the v0.3.1 tag (the 0.3.1 wheel omits it, so
+#: TrackMetadataCatalog.load_builtin() raises FileNotFoundError).
+CATALOG_PATH = Path("/scratch/yl12316/models/alphagenome/track_metadata_human.parquet")
+CATALOG_SHA256 = "ca3aa278a0b8fb890eb8d5b20f29f9ba9bf6b55a2b14825660d2697e3fad899e"
+CATALOG_URL = (
+    "https://raw.githubusercontent.com/genomicsxai/alphagenome-pytorch/"
+    "v0.3.1/src/alphagenome_pytorch/data/track_metadata_human.parquet")
+N_USAGE_TRACKS = 734
+
+
+def resolve_usage_track(catalog_path: Path | str = CATALOG_PATH,
+                        ontology: str = "CL:0002518",
+                        strand: str = "+") -> int:
+    """Look the usage-track index up in the catalogue, don't trust the constant.
+
+    ``USAGE_TRACK_PLUS`` is a cached answer; this re-derives it so that a
+    changed or corrupted catalogue fails loudly instead of silently scoring
+    the wrong cell type. Returns the index on the 734-track axis.
+    """
+    import pandas as pd
+
+    catalog_path = Path(catalog_path)
+    if not catalog_path.exists():
+        raise FileNotFoundError(
+            f"track catalogue not found: {catalog_path}\n"
+            f"fetch it with:  curl -fL --create-dirs -o {catalog_path} "
+            f"{CATALOG_URL}")
+
+    df = pd.read_parquet(catalog_path)
+    usage = df[df.output_type == "splice_site_usage"].reset_index(drop=True)
+    if len(usage) != N_USAGE_TRACKS:
+        raise ValueError(
+            f"catalogue has {len(usage)} splice_site_usage rows, expected "
+            f"{N_USAGE_TRACKS}; it does not describe this checkpoint's head")
+
+    curie = usage.ontology_curie.astype(str).str.replace("_", ":", regex=False)
+    hits = usage[(curie == ontology) & (usage.strand == strand)]
+    if len(hits) != 1:
+        raise ValueError(
+            f"expected exactly 1 {ontology} track on strand {strand!r}, "
+            f"found {len(hits)}:\n{hits[['track_index', 'track_name', 'strand']]}")
+
+    idx = int(hits.track_index.iloc[0])
+    # track_index runs 0..733 with no padding rows, so it indexes the tensor's
+    # last axis directly; guard that assumption.
+    if not 0 <= idx < N_USAGE_TRACKS:
+        raise ValueError(f"track_index {idx} is outside [0, {N_USAGE_TRACKS})")
+    if strand == "+" and idx != USAGE_TRACK_PLUS:
+        raise ValueError(
+            f"catalogue says {ontology} (+) is track {idx}, but this module "
+            f"has USAGE_TRACK_PLUS={USAGE_TRACK_PLUS}. Resolve before scoring: "
+            "every label depends on this index.")
+    return idx
+
 
 # ==========================================================================
 # context loading and geometry
@@ -380,13 +452,14 @@ def make_model(backend: str = "api", *, env_path: str | None = None, **kw):
         import alphagenome_local_prediction_pipeline_minigene as ag
         return ag.create_model(env_path=env_path)
     if backend == "local":
-        raise NotImplementedError(
-            "The local backend is not wired up yet. Implement an adapter "
-            "exposing predict_sequence(...) as described in make_model's "
-            "docstring and return it here; nothing else in this module needs "
-            "to change. Note that a local backend also makes batching "
-            "worthwhile, which run_scoring does not currently do -- it calls "
-            "one sequence at a time because the API quota forced that.")
+        # NOTE: the local path deliberately does NOT implement
+        # predict_sequence(). The API contract above is one-sequence-at-a-time
+        # because the quota forced that; locally the throughput lever is the
+        # batch, so the local backend exposes score(seqs) / usage(seqs) and is
+        # driven by local_backend.run_scoring_local, which keeps the same
+        # on-disk contract (append-mode CSV, resume on row_id).
+        import local_backend as LB
+        return LB.LocalScorer(**kw)
     raise ValueError(f"unknown backend {backend!r}; expected one of {BACKENDS}")
 
 

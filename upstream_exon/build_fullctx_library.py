@@ -76,6 +76,14 @@ LIBRARIES = {
     "middle": {
         "slot": "syn70",
         "length": F.SYN_LEN,
+        # DELIBERATELY balanced (GC 48.6%), not syn_a5.0_00482's own
+        # composition (A15/C28/G14/T13, GC 60.0%). Decided 2026-11-17: both
+        # arms use the SAME randomization scheme -- an even-composition block,
+        # order-only variation -- so the effect sizes compare slots under a
+        # matched protocol rather than comparing two different schemes.
+        # Consequence, accepted: syn_a5.0_00482 is not a member of this class,
+        # so this library has no sequence reproducing the `upstream` library's
+        # baseline. Do not "fix" this to match the reference exon.
         "counts": {"A": 18, "T": 18, "C": 17, "G": 17},
         "n_total": 500_000,
         "splits": {"train": 400_000, "val": 20_000, "test": 80_000},
