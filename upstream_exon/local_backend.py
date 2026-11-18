@@ -181,6 +181,15 @@ class LocalScorer:
         sub = pred.index_select(1, idx_p).index_select(2, idx_t)  # (B, 2, T)
         return sub.permute(0, 2, 1).float().cpu().numpy()        # (B, T, 2)
 
+    def predict_heads(self, seqs: list[str], heads: tuple[str, ...]) -> dict:
+        """Raw output dict for ``heads``, tensors left on the device.
+
+        The low-level escape hatch for analyses that need whole per-position
+        tracks rather than two positions -- the cryptic-site scan, chiefly.
+        Callers slice on the device and move only the summary to the host.
+        """
+        return self.model.predict(self._onehot(list(seqs)), 0, heads=heads)
+
     def usage(self, seqs: list[str]) -> np.ndarray:
         """``(B, 2)`` plus-strand usage at (acceptor, donor), OOM-adaptive.
 
