@@ -45,6 +45,10 @@ HEAD = "splice_site_usage"
 #: batch sizes tried in order; the first that does not OOM is kept
 BATCH_LADDER = (32, 16, 8, 4, 2, 1)
 
+#: tissues per strand in the splice_junctions head (model.py:277). The
+#: pred_counts last axis is 2x this: [plus 367][minus 367].
+N_JUNCTION_TISSUES = 367
+
 
 # ==========================================================================
 # the scorer
@@ -189,6 +193,51 @@ class LocalScorer:
         Callers slice on the device and move only the summary to the host.
         """
         return self.model.predict(self._onehot(list(seqs)), 0, heads=heads)
+
+    def predict_junctions(self, seqs: list[str], positions):
+        """``splice_junctions`` evaluated at CALLER-SUPPLIED positions.
+
+        ``positions`` is (B, 4, P) of absolute indices into the 16,384 axis,
+        in the head's own row order:
+            row 0 pos_donor, row 1 pos_acceptor,
+            row 2 neg_donor, row 3 neg_acceptor
+        Negative entries are padding; the head builds its mask from
+        ``idx >= 0`` and zeroes those cells, so -1 is the safe filler.
+
+        Supplying positions makes the model SKIP its own top-512 candidate
+        generation (model.py:777-799). That is the whole trick: pred_counts
+        is (B, P, P, 2*367), so P=8 costs 188 KB per sequence where the
+        default P=512 costs 779 MB. The last axis is
+        ``cat([pos_counts, neg_counts])``, i.e. [367 plus][367 minus] --
+        the same layout as the usage head, so the plus-strand tissue index
+        is reused and its minus twin is +367.
+
+        Values are ``softplus`` outputs: non-negative unbounded counts, not
+        probabilities. Only ratios between them are meaningful.
+        """
+        torch = self.torch
+        x = self._onehot(list(seqs))
+        pos = torch.as_tensor(positions, dtype=torch.long, device=x.device)
+        if pos.ndim != 3 or pos.shape[1] != 4:
+            raise ValueError(
+                f"positions must be (B, 4, P), got {tuple(pos.shape)}")
+        if pos.shape[0] != x.shape[0]:
+            raise ValueError(
+                f"positions batch {pos.shape[0]} != {x.shape[0]} sequences")
+        out = self.model.predict(x, 0, heads=("splice_junctions",),
+                                 splice_site_positions=pos)
+        blk = out["splice_junctions"]
+        pc = blk["pred_counts"]
+        P = pos.shape[-1]
+        if tuple(pc.shape[1:3]) != (P, P):
+            raise ValueError(
+                f"pred_counts is {tuple(pc.shape)}, expected (B,{P},{P},*) -- "
+                f"splice_site_positions was probably ignored")
+        if pc.shape[-1] != 2 * N_JUNCTION_TISSUES:
+            raise ValueError(
+                f"pred_counts last axis {pc.shape[-1]} != "
+                f"2 x {N_JUNCTION_TISSUES}")
+        return blk
 
     def usage(self, seqs: list[str]) -> np.ndarray:
         """``(B, 2)`` plus-strand usage at (acceptor, donor), OOM-adaptive.
