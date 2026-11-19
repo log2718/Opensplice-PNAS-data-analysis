@@ -5,8 +5,11 @@
 #SBATCH --gres=gpu:l40s:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=12:00:00
+#SBATCH --time=02:00:00
 #SBATCH --requeue
+# Warn the job steps 3 min before the walltime so the scorer can
+# flush and release its lock instead of being SIGKILLed.
+#SBATCH --signal=USR1@180
 #SBATCH --open-mode=append
 #SBATCH --output=logs/fullctx_%x_%A_%a.out
 #SBATCH --error=logs/fullctx_%x_%A_%a.err
@@ -33,13 +36,15 @@
 # So you submit once and it runs to completion, however long that is. A task
 # that starts with nothing left to do exits in seconds.
 #
-#   1. upstream, 1,000,000 rows -- chain of 8 x 12 h, one at a time:
-#        LIBRARY=upstream sbatch --array=0-7%1 \
+#   1. upstream, 1,000,000 rows -- chain of 2 h tasks, one at a time.
+#      Short walltimes schedule sooner, and a task that is cut off flushes
+#      on SIGUSR1 and exits cleanly, so the next one resumes from row_id:
+#        LIBRARY=upstream sbatch --array=0-11%1 \
 #            upstream_exon/slurm/score_fullctx.sbatch
 #
-#   2. middle, 500,000 rows (safe to run CONCURRENTLY with 1 if a second GPU
-#      is free -- different CSVs, different lock, and no shared quota now):
-#        LIBRARY=middle sbatch --array=0-3%1 \
+#   2. middle, 500,000 rows. Do NOT run concurrently with 1: the per-user
+#      GPU cap (QOSMaxGRESPerUser) cancelled 23546677_0 mid-run. Chain it:
+#        LIBRARY=middle sbatch --dependency=afterany:<job1> --array=0-5%1 \
 #            upstream_exon/slurm/score_fullctx.sbatch
 #
 #   3. to sanity-check the plumbing without committing, add PILOT:

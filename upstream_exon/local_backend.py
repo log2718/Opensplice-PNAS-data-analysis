@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import json
 import sys
+import signal
 import time
 from pathlib import Path
 
@@ -48,6 +49,9 @@ BATCH_LADDER = (32, 16, 8, 4, 2, 1)
 #: tissues per strand in the splice_junctions head (model.py:277). The
 #: pred_counts last axis is 2x this: [plus 367][minus 367].
 N_JUNCTION_TISSUES = 367
+
+#: abort once this many rows have failed with nothing yet succeeding
+FAIL_FAST_AFTER = 64
 
 
 # ==========================================================================
@@ -83,7 +87,16 @@ class LocalScorer:
         self.track_index = int(track_index)
         self.track_index_minus = F.USAGE_TRACK_MINUS
 
-        _, self.acc_pos, self.don_pos = F.padded_positions()
+        left_pad, self.acc_pos, self.don_pos = F.padded_positions()
+        # All FOUR cassette splice sites, not just the middle exon's two.
+        # B1 ends 3 nt before the upstream exon's own donor, so permuting it
+        # can act through that site; recording only the middle exon's pair
+        # makes that mechanism invisible. Reading two extra positions out of
+        # a tensor we have already computed costs nothing.
+        self.sites = F.designed_sites(left_pad)
+        self.site_order = ("middle_acceptor", "middle_donor",
+                           "upstream_donor", "downstream_acceptor")
+        self.all_positions = tuple(self.sites[k] for k in self.site_order)
 
         print(f"[local] loading {self.weights} on {device}", flush=True)
         t0 = time.time()
@@ -133,6 +146,15 @@ class LocalScorer:
         torch = self.torch
         mats = []
         for s in seqs:
+            # Centre-pad here, once, for every caller. preflight() and the
+            # cryptic scan pad before calling; score_fullctx hands over the
+            # raw 8,612-nt construct, and that mismatch failed 100% of rows
+            # in job 23546677 while the preflight passed, because only the
+            # preflight's input was padded. center_pad is idempotent -- an
+            # already-padded sequence comes back unchanged -- so doing it
+            # here is safe for the callers that already did it.
+            if len(s) < F.TARGET_LEN:
+                s, _, _ = F.center_pad(s)
             t = self._onehot_fn(s)
             if not torch.is_tensor(t):
                 t = torch.as_tensor(np.asarray(t))
@@ -149,7 +171,8 @@ class LocalScorer:
 
     # -------------------------------------------------------------- forward
 
-    def _forward(self, seqs: list[str], *, tracks: tuple[int, ...]) -> np.ndarray:
+    def _forward(self, seqs: list[str], *, tracks: tuple[int, ...],
+                 positions: tuple[int, ...] | None = None) -> np.ndarray:
         """``(B, len(tracks), 2)`` -- usage at (acceptor, donor) per track."""
         torch = self.torch
         x = self._onehot(seqs)
@@ -180,7 +203,8 @@ class LocalScorer:
         # Slice on the GPU: the full tensor is 48 MB per sequence and we want
         # 2 floats per track from it.
         idx_t = torch.as_tensor(tracks, device=pred.device, dtype=torch.long)
-        idx_p = torch.as_tensor([self.acc_pos, self.don_pos],
+        idx_p = torch.as_tensor(list(positions if positions is not None
+                                     else (self.acc_pos, self.don_pos)),
                                 device=pred.device, dtype=torch.long)
         sub = pred.index_select(1, idx_p).index_select(2, idx_t)  # (B, 2, T)
         return sub.permute(0, 2, 1).float().cpu().numpy()        # (B, T, 2)
@@ -240,7 +264,8 @@ class LocalScorer:
         return blk
 
     def usage(self, seqs: list[str]) -> np.ndarray:
-        """``(B, 2)`` plus-strand usage at (acceptor, donor), OOM-adaptive.
+        """``(B, 4)`` plus-strand usage at the four designed sites,
+        in ``self.site_order``, OOM-adaptive.
 
         Accepts any number of sequences and returns exactly that many rows.
         An OOM lowers ``batch_size`` for the rest of the run and retries the
@@ -254,7 +279,8 @@ class LocalScorer:
             size = min(self.batch_size, len(seqs) - i)
             try:
                 got = self._forward(seqs[i:i + size],
-                                    tracks=(self.track_index,))
+                                    tracks=(self.track_index,),
+                                    positions=self.all_positions)
             except self.torch.cuda.OutOfMemoryError:
                 self.torch.cuda.empty_cache()
                 nxt = next((b for b in BATCH_LADDER if b < size), None)
@@ -272,13 +298,26 @@ class LocalScorer:
         return np.concatenate(chunks, axis=0)
 
     def score(self, seqs: list[str]) -> list[dict[str, float]]:
-        """One record per sequence, with ``logit_average`` as the target."""
+        """One record per sequence, with ``logit_average`` as the target.
+
+        The target is unchanged: MIDDLE exon acceptor and donor only. The
+        upstream donor and downstream acceptor ride along as covariates --
+        they are what lets you ask whether a B1 effect travels through the
+        upstream 5'SS instead of acting on the middle exon directly. Do not
+        fold them into the target.
+        """
         u = self.usage(list(seqs))
-        return [{"AG_acceptor_usage": float(a),
-                 "AG_donor_usage": float(d),
-                 "AG_mean_usage": (float(a) + float(d)) / 2.0,
-                 "logit_average": F.logit_average(float(a), float(d))}
-                for a, d in u]
+        out = []
+        for row in u:
+            a, d, up, dn = (float(x) for x in row)
+            out.append({"AG_acceptor_usage": a,
+                        "AG_donor_usage": d,
+                        "AG_mean_usage": (a + d) / 2.0,
+                        "logit_average": F.logit_average(a, d),
+                        # covariates, NOT part of the target
+                        "AG_upstream_donor_usage": up,
+                        "AG_downstream_acceptor_usage": dn})
+        return out
 
     # ----------------------------------------------------------- provenance
 
@@ -295,6 +334,8 @@ class LocalScorer:
             "track_index_minus": self.track_index_minus,
             "ontology": F.ONTOLOGY[0],
             "head": HEAD,
+            "designed_sites_padded": dict(self.sites),
+            "site_order": list(self.site_order),
             "acceptor_padded": self.acc_pos,
             "donor_padded": self.don_pos,
             "target_len": F.TARGET_LEN,
@@ -420,6 +461,7 @@ def _native_syn70() -> str:
 
 def run_scoring_local(jobs, out_csv: Path, scorer: LocalScorer, *,
                       flush_every: int = 2_000,
+                      flush_seconds: float = 300.0,
                       failed_csv: Path | None = None,
                       progress_every: int = 2_000,
                       skip_ids: set[str] | None = None,
@@ -458,7 +500,11 @@ def run_scoring_local(jobs, out_csv: Path, scorer: LocalScorer, *,
     n_failed = 0
     t0 = time.time()
 
+    t_flush = time.time()
+
     def flush() -> None:
+        nonlocal t_flush
+        t_flush = time.time()
         nonlocal written
         if not buf:
             return
@@ -470,14 +516,50 @@ def run_scoring_local(jobs, out_csv: Path, scorer: LocalScorer, *,
     def record_failure(job: dict, exc: BaseException) -> None:
         nonlocal n_failed
         n_failed += 1
+        # A systematic failure looks exactly like fast progress: job
+        # 23546677 "ran" at 132 seq/s for two hours and wrote a 178 MB
+        # failure log and zero results. If nothing has EVER succeeded by
+        # the time we have this many failures, the fault is systematic and
+        # continuing only burns allocation.
+        if written == 0 and not buf and n_failed >= FAIL_FAST_AFTER:
+            raise SystemExit(
+                f"FATAL: {n_failed} consecutive failures and zero successes."
+                f"\n       Last error: {type(exc).__name__}: {exc}"
+                f"\n       This is systematic, not sporadic -- fix it rather "
+                f"than resuming.")
         rec = {k: v for k, v in job.items() if k != "seq"}
         rec["error"] = f"{type(exc).__name__}: {exc}"[:300]
         if failed_csv:
             pd.DataFrame([rec]).to_csv(failed_csv, mode="a", index=False,
                                        header=not failed_csv.exists())
 
+    # Graceful shutdown. With --signal=USR1@180 SLURM warns us before the
+    # walltime axe falls; we flush, release the lock by returning normally,
+    # and the next array task resumes from row_id. Without this a short
+    # walltime means every task ends in SIGKILL, which also strands the
+    # lockfile. This is what makes 2 h chaining as safe as 12 h.
+    stopping = {"flag": False}
+
+    def _on_signal(signum, _frame):
+        stopping["flag"] = True
+        print(f"  [signal] {signal.Signals(signum).name} received -- "
+              f"finishing this batch, flushing, then exiting cleanly",
+              flush=True)
+
+    for _sig in (signal.SIGUSR1, signal.SIGTERM):
+        try:
+            signal.signal(_sig, _on_signal)
+        except (ValueError, OSError):
+            pass                      # not the main thread; skip silently
+
     i = 0
     while i < total:
+        if stopping["flag"]:
+            flush()
+            print(f"  [signal] stopped early at {i:,}/{total:,}; "
+                  f"{written:,} rows written. Resume picks up from row_id.",
+                  flush=True)
+            return written
         batch = todo[i:i + scorer.batch_size]
         try:
             results = scorer.score([j["seq"] for j in batch])
@@ -501,7 +583,11 @@ def run_scoring_local(jobs, out_csv: Path, scorer: LocalScorer, *,
             buf.append(rec)
 
         i += len(batch)
-        if len(buf) >= flush_every:
+        # Flush on EITHER a row count or elapsed time. Row count alone is a
+        # trap: array task 23546677_0 ran 2h08m, was cancelled before it
+        # buffered 2,000 rows, and lost every row it had computed. Bounded
+        # loss must not depend on throughput we have not measured.
+        if len(buf) >= flush_every or (buf and time.time() - t_flush >= flush_seconds):
             flush()
         # Report after the FIRST batch too, not just every flush: the whole
         # point of a self-measuring run is seeing seq/s within seconds, so a

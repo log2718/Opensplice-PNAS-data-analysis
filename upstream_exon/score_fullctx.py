@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -50,17 +51,59 @@ class Lock:
         self.path = path
         self.fd = None
 
+    @staticmethod
+    def _holder_is_alive(text: str) -> bool | None:
+        """Is the SLURM job recorded in the lockfile still queued or running?
+
+        Returns None when we cannot tell (no job id, squeue missing), in
+        which case the caller must NOT steal the lock.
+        """
+        parts = text.split()
+        if len(parts) < 3 or parts[2] == "local":
+            return None
+        try:
+            r = subprocess.run(["squeue", "-h", "-j", parts[2], "-o", "%i"],
+                               capture_output=True, text=True, timeout=30)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if r.returncode != 0:
+            # squeue errors on a job it has already purged; that is itself
+            # evidence the holder is gone, but only if it said so clearly.
+            return False if "Invalid job id" in (r.stderr or "") else None
+        return bool(r.stdout.strip())
+
     def __enter__(self):
         try:
             self.fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
             age = time.time() - self.path.stat().st_mtime
-            sys.exit(
-                f"FATAL: {self.path} exists (age {age / 60:.0f} min) -- another "
-                f"scorer holds the lock.\n"
-                f"       If you are certain no scorer is running (check "
-                f"`squeue -u $USER`), delete it:\n"
-                f"         rm {self.path}")
+            try:
+                text = self.path.read_text().strip()
+            except OSError:
+                text = ""
+            alive = self._holder_is_alive(text)
+            if alive is False:
+                # A cancelled or OOM-killed task never runs __exit__, so its
+                # lock outlives it and every later task in the chain dies on
+                # startup. That is what happened to 23546677_[1-7]: seven
+                # tasks burned ~40s each failing on a lock whose owner was
+                # already dead. Reclaim it, loudly.
+                print(f"[lock] stale lock from {text!r} "
+                      f"(age {age / 60:.0f} min); its job is no longer in "
+                      f"the queue -- reclaiming", flush=True)
+                self.path.unlink(missing_ok=True)
+                self.fd = os.open(self.path,
+                                  os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            else:
+                why = ("holder is still in the queue" if alive
+                       else "could not determine whether the holder is alive")
+                sys.exit(
+                    f"FATAL: {self.path} exists (age {age / 60:.0f} min), "
+                    f"holder {text!r}\n"
+                    f"       {why}.\n"
+                    f"       If you are certain no scorer is running (check "
+                    f"`squeue -u $USER`), delete it:\n"
+                    f"         rm {self.path}")
         os.write(self.fd, f"{os.getpid()} {time.time():.0f} "
                           f"{os.environ.get('SLURM_JOB_ID', 'local')}\n".encode())
         return self

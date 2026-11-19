@@ -5,8 +5,9 @@
 #SBATCH --gres=gpu:l40s:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=06:00:00
+#SBATCH --time=02:00:00
 #SBATCH --requeue
+#SBATCH --signal=USR1@180
 #SBATCH --open-mode=append
 #SBATCH --output=logs/cryptic_%x_%j.out
 #SBATCH --error=logs/cryptic_%x_%j.err

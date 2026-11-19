@@ -330,6 +330,43 @@ def validate_construct(seq: str, b1: str, syn70: str,
     return fails
 
 
+def designed_sites(left_pad: int) -> dict[str, int]:
+    """The FOUR designed splice sites of the cassette, PADDED coordinates.
+
+    B1 is the upstream exon BODY and ends 3 nt before that exon's own donor
+    (``_split``: B1 = up_exon[:-DONOR_EXONIC]). So permuting B1 changes
+    sequence immediately adjacent to a real splice site, which is a mechanism
+    the middle exon's two sites alone cannot see.
+
+    Every position is checked against its GT/AG motif, because an off-by-one
+    here silently reports a neighbouring base's score. The downstream
+    acceptor is motif-anchored for exactly that reason: block arithmetic puts
+    it at 7053, but the intron's AG ends at 7053, so the first exonic base is
+    7054. Treat the 1 nt disagreement with PNAS_EXON3's boundary as a known
+    discrepancy in the block constants, not something this scan resolves.
+    """
+    g, b = GEOMETRY, SP.pnas_blocks8()
+    ctx = load_context()
+    up_donor = g["b1_start"] + len(b["B1"]) + SP.DONOR_EXONIC - 1
+    dn_acceptor = (g["syn_end"] + len(b["B5"]) + len(b["B6"])
+                   + SP.ACCEPTOR_INTRONIC)
+    if ctx[dn_acceptor - 2:dn_acceptor] != "AG":
+        dn_acceptor += 1                      # motif-anchored, see docstring
+    sites = {"upstream_donor": up_donor, "middle_acceptor": g["acceptor"],
+             "middle_donor": g["donor"], "downstream_acceptor": dn_acceptor}
+    for nm, pos in sites.items():
+        if nm.endswith("donor"):
+            got, want = ctx[pos + 1:pos + 3], "GT"
+        else:
+            got, want = ctx[pos - 2:pos], "AG"
+        if got != want:
+            raise ValueError(
+                f"{nm} at ctx {pos}: expected {want}, found {got!r} -- the "
+                f"geometry constants and the context file disagree")
+    return {k: left_pad + v for k, v in sites.items()}
+
+
+
 def padded_positions(context_len: int = CONTEXT_LEN,
                      target_len: int = TARGET_LEN) -> tuple[int, int, int]:
     """``(left_pad, acceptor_index, donor_index)`` in the padded input."""
