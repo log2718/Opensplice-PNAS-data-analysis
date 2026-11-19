@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=b1v3_fnbm
-#SBATCH --account=torch_pr_352_general
+#SBATCH --account=torch_pr_352_courant
 #SBATCH --partition=l40s_public
 #SBATCH --gres=gpu:1
 #SBATCH --nodes=1

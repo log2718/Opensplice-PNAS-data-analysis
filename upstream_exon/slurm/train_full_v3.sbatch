@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=b1v3_train
-#SBATCH --account=torch_pr_352_general
+#SBATCH --account=torch_pr_352_courant
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=12:00:00

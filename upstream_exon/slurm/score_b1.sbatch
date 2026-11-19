@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=b1_score
-#SBATCH --account=torch_pr_352_general
+#SBATCH --account=torch_pr_352_courant
 #SBATCH --partition=l40s_public
 #SBATCH --gres=gpu:l40s:1
 #SBATCH --cpus-per-task=4
@@ -19,7 +19,7 @@
 # This job is pure network I/O: a single stream of gRPC calls to the
 # AlphaGenome API. It needs no GPU and barely any CPU. But `cpu_public` does
 # not exist on this cluster, and the only allocation confirmed to work on
-# account torch_pr_352_general is:
+# account torch_pr_352_courant is:
 #
 #     --partition=l40s_public --gres=gpu:l40s:1 --cpus-per-task=4 --mem=12G
 #

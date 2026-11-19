@@ -140,23 +140,61 @@ def resolve_junction_tissue(catalog_path: str | Path,
     return usage_index, "inferred-from-usage-head"
 
 
-def pick_candidates(track, designed_pos: int, left_pad: int,
-                    n: int = N_CANDIDATES, nms: int = NMS_WINDOW):
-    """Greedy top-n positions on a (B, L) probability track.
+def designed_sites(left_pad: int) -> dict[str, int]:
+    """The FOUR designed splice sites of the cassette, PADDED coordinates.
 
-    Returns a LongTensor (B, 1 + n) of PADDED indices whose column 0 is the
-    designed site, so pred_counts[:, 0, 0] is always the designed junction
-    and every other cell is a competitor. Positions with nothing left to
-    pick come back as -1, which the junction head masks out.
+    B1 is the upstream exon BODY and ends 3 nt before that exon's own donor
+    (``_split``: B1 = up_exon[:-DONOR_EXONIC]). So permuting B1 changes
+    sequence immediately adjacent to a real splice site, which is a mechanism
+    the middle exon's two sites alone cannot see.
+
+    Every position is checked against its GT/AG motif, because an off-by-one
+    here silently reports a neighbouring base's score. The downstream
+    acceptor is motif-anchored for exactly that reason: block arithmetic puts
+    it at 7053, but the intron's AG ends at 7053, so the first exonic base is
+    7054. Treat the 1 nt disagreement with PNAS_EXON3's boundary as a known
+    discrepancy in the block constants, not something this scan resolves.
+    """
+    g, b = F.GEOMETRY, SP.pnas_blocks8()
+    ctx = F.load_context()
+    up_donor = g["b1_start"] + len(b["B1"]) + SP.DONOR_EXONIC - 1
+    dn_acceptor = (g["syn_end"] + len(b["B5"]) + len(b["B6"])
+                   + SP.ACCEPTOR_INTRONIC)
+    if ctx[dn_acceptor - 2:dn_acceptor] != "AG":
+        dn_acceptor += 1                      # motif-anchored, see docstring
+    sites = {"upstream_donor": up_donor, "middle_acceptor": g["acceptor"],
+             "middle_donor": g["donor"], "downstream_acceptor": dn_acceptor}
+    for nm, pos in sites.items():
+        if nm.endswith("donor"):
+            got, want = ctx[pos + 1:pos + 3], "GT"
+        else:
+            got, want = ctx[pos - 2:pos], "AG"
+        if got != want:
+            raise ValueError(
+                f"{nm} at ctx {pos}: expected {want}, found {got!r} -- the "
+                f"geometry constants and the context file disagree")
+    return {k: left_pad + v for k, v in sites.items()}
+
+
+def pick_candidates(track, fixed: list[int], left_pad: int,
+                    n: int = N_CANDIDATES, nms: int = NMS_WINDOW):
+    """``fixed`` positions first, then the top-n remaining peaks.
+
+    Returns a LongTensor (B, len(fixed) + n) of PADDED indices. The fixed
+    columns are the designed sites, so their cells in the junction matrix
+    are always present regardless of what the motif head scores; the rest
+    are competitors found greedily with +/- ``nms`` nt suppression, so they
+    are distinct sites and not one peak's shoulders.
     """
     import torch
     B, _ = track.shape
     work = track.clone()
     work[:, :left_pad] = -1.0
     work[:, left_pad + F.CONTEXT_LEN:] = -1.0
-    work[:, max(0, designed_pos - nms): designed_pos + nms + 1] = -1.0
-    cols = [torch.full((B,), designed_pos, dtype=torch.long,
-                       device=track.device)]
+    for f in fixed:
+        work[:, max(0, f - nms): f + nms + 1] = -1.0
+    cols = [torch.full((B,), f, dtype=torch.long, device=track.device)
+            for f in fixed]
     for _ in range(n):
         val, idx = work.max(dim=1)
         idx = torch.where(val > 0, idx, torch.full_like(idx, -1))
@@ -170,55 +208,92 @@ def pick_candidates(track, designed_pos: int, left_pad: int,
 
 def junction_features(pred_counts, don_cols, acc_cols, tissue: int,
                       left_pad: int) -> list[dict]:
-    """Competition metrics from pred_counts (B, P, P, 2*367).
+    """Inclusion / skipping / cryptic competition from (B, P, P, 2*367).
 
-    Axis 1 indexes the donor list, axis 2 the acceptor list; column 0 of
-    each is the designed site. Counts are softplus outputs -- unbounded and
-    non-negative -- so only RATIOS are interpretable, never a raw value.
+    Column order is fixed by ``pick_candidates``:
+        donors    [0] upstream_donor  [1] middle_donor  [2:] cryptic
+        acceptors [0] middle_acceptor [1] downstream_acceptor [2:] cryptic
+    so the biologically named cells are
+
+        [0, 0]  upstream donor -> middle acceptor   inclusion, 5' junction
+        [1, 1]  middle donor   -> downstream acc.   inclusion, 3' junction
+        [0, 1]  upstream donor -> downstream acc.   EXON SKIPPING
+        [1, 0]  middle donor   -> middle acceptor   backwards; must be ~0
+
+    That last cell is the sanity check: its acceptor lies 75 nt UPSTREAM of
+    its donor, so a non-trivial value means the axes are transposed.
+
+    Counts are softplus outputs -- unbounded, non-negative -- so only ratios
+    mean anything. ``psi`` is the inclusion share and is the quantity the
+    whole experiment is about.
     """
     import torch
-    m = pred_counts[:, :, :, tissue].float()              # (B, P, P)
+    m = pred_counts[:, :, :, tissue].float()
     B, P, _ = m.shape
     valid = (don_cols >= 0)[:, :, None] & (acc_cols >= 0)[:, None, :]
     m = torch.where(valid, m, torch.zeros_like(m))
 
-    designed = m[:, 0, 0]
+    incl5, incl3 = m[:, 0, 0], m[:, 1, 1]
+    skip, backwards = m[:, 0, 1], m[:, 1, 0]
+    incl = 0.5 * (incl5 + incl3)
     total = m.sum(dim=(1, 2))
-    from_don = m[:, 0, :].sum(dim=1)     # designed donor -> any acceptor
-    to_acc = m[:, :, 0].sum(dim=1)       # any donor -> designed acceptor
+
+    # any junction using a cryptic site at either end
+    cryptic = total - (incl5 + incl3 + skip + backwards)
 
     off = m.clone()
-    off[:, 0, 0] = 0.0
+    for r, c in ((0, 0), (1, 1), (0, 1), (1, 0)):
+        off[:, r, c] = 0.0
     omax, oarg = off.reshape(B, -1).max(dim=1)
-    od = (oarg // P).cpu().numpy()
-    oa = (oarg % P).cpu().numpy()
+    od, oa = (oarg // P).cpu().numpy(), (oarg % P).cpu().numpy()
 
-    eps = 1e-12
-    designed_n = designed.cpu().numpy()
-    total_n = total.cpu().numpy()
-    fdon = from_don.cpu().numpy()
-    tacc = to_acc.cpu().numpy()
-    omax_n = omax.cpu().numpy()
-    dc = don_cols.cpu().numpy()
-    ac = acc_cols.cpu().numpy()
+    # Host copies. The _h suffix is not decoration: every name above is a
+    # device tensor and every name below is its numpy twin, and `incl` vs
+    # `inc` differing by one letter is how that goes wrong silently.
+    def _h(t):
+        return t.cpu().numpy()
+
+    incl5_h, incl3_h = _h(incl5), _h(incl3)
+    skip_h, back_h = _h(skip), _h(backwards)
+    incl_h, total_h = _h(incl), _h(total)
+    cryptic_h, offmax_h = _h(cryptic), _h(omax)
+    don_h, acc_h = _h(don_cols), _h(acc_cols)
+
+    def ratio(num: float, den: float) -> float:
+        """NaN, never 0, when the denominator carries no signal.
+
+        An eps guard here would be worse than useless: it turns 0/0 into a
+        confident 0.0, so a locus the model routes NOTHING through reports
+        psi = 0 and is indistinguishable from a fully skipped exon. That
+        would pile fake mass at PSI = 0. NaN propagates instead, so those
+        rows drop out of means and correlations rather than biasing them.
+        Soft cases -- tiny but non-zero flux -- are not caught here; filter
+        them on junc_total, which is recorded for exactly that purpose.
+        """
+        return float(num) / float(den) if den > 0 else float("nan")
 
     recs = []
     for i in range(B):
         recs.append({
-            "junc_designed": float(designed_n[i]),
-            "junc_total": float(total_n[i]),
-            # share of ALL predicted junction flux using the designed pair
-            "junc_designed_frac": float(designed_n[i] / (total_n[i] + eps)),
-            # of the flux leaving the designed donor, how much misses the
-            # designed acceptor -- i.e. an alternative 3' site is winning
-            "junc_donor_leak": float(1.0 - designed_n[i] / (fdon[i] + eps)),
-            # and the mirror: flux arriving at the designed acceptor from a
-            # donor that is not ours
-            "junc_acceptor_leak": float(1.0 - designed_n[i] / (tacc[i] + eps)),
-            "junc_top_offpair": float(omax_n[i]),
-            "junc_top_offpair_frac": float(omax_n[i] / (total_n[i] + eps)),
-            "junc_top_offpair_donor_ctx": int(dc[i, od[i]] - left_pad),
-            "junc_top_offpair_acceptor_ctx": int(ac[i, oa[i]] - left_pad),
+            "junc_incl_5p": float(incl5_h[i]),
+            "junc_incl_3p": float(incl3_h[i]),
+            "junc_skip": float(skip_h[i]),
+            "junc_backwards": float(back_h[i]),   # sanity: expect ~0
+            "junc_total": float(total_h[i]),
+            # The headline. incl_h is the PER-TRANSCRIPT inclusion count,
+            # i.e. the mean of the two inclusion junctions -- an included
+            # transcript contributes a read to BOTH of them, a skipped one
+            # contributes a single read to skip_h. Summing instead of
+            # averaging would overstate inclusion by 2x.
+            "psi": ratio(incl_h[i], incl_h[i] + skip_h[i]),
+            # how asymmetric the two inclusion junctions are
+            "junc_incl_asym": ratio(incl5_h[i] - incl3_h[i],
+                                    incl5_h[i] + incl3_h[i]),
+            # share of all flux routed through ANY cryptic site
+            "junc_cryptic_frac": ratio(cryptic_h[i], total_h[i]),
+            "junc_top_offpair_frac": ratio(offmax_h[i], total_h[i]),
+            "junc_top_offpair_donor_ctx": int(don_h[i, od[i]] - left_pad),
+            "junc_top_offpair_acceptor_ctx": int(acc_h[i, oa[i]] - left_pad),
         })
     return recs
 
@@ -384,6 +459,9 @@ def main() -> int:
     context = F.load_context()
     left_pad, acc_pos, don_pos = F.padded_positions()
 
+    sites = designed_sites(left_pad)
+    print("  designed sites (ctx): "
+          + "  ".join(f"{k}={v - left_pad}" for k, v in sites.items()))
     tissue_idx = tissue_src = None
     if not args.no_junctions:
         tissue_idx, tissue_src = resolve_junction_tissue(
@@ -404,6 +482,7 @@ def main() -> int:
                                "junction_tissue_index": tissue_idx,
                                "junction_tissue_source": tissue_src,
                                "n_candidates": N_CANDIDATES,
+                               "designed_sites_ctx": {k: v - left_pad for k, v in sites.items()},
                                "nms_window": NMS_WINDOW,
                                "preflight": pre})
 
@@ -461,10 +540,13 @@ def main() -> int:
             # batch. The junction head itself is nearly free at P=8; the
             # cost here is one extra trunk evaluation.
             import torch
-            don_cols = pick_candidates(ss[:, :, ch["donor_plus"]],
-                                       don_pos, left_pad)
-            acc_cols = pick_candidates(ss[:, :, ch["acceptor_plus"]],
-                                       acc_pos, left_pad)
+            don_cols = pick_candidates(
+                ss[:, :, ch["donor_plus"]],
+                [sites["upstream_donor"], sites["middle_donor"]], left_pad)
+            acc_cols = pick_candidates(
+                ss[:, :, ch["acceptor_plus"]],
+                [sites["middle_acceptor"], sites["downstream_acceptor"]],
+                left_pad)
             neg = torch.full_like(don_cols, -1)
             positions = torch.stack([don_cols, acc_cols, neg, neg], dim=1)
             blk = scorer.predict_junctions(seqs, positions)
@@ -537,22 +619,27 @@ def _summary(out_csv: Path, slot: str) -> None:
                   f"{df.logit_average.corr(df[uc]):+.4f}")
             print(f"  cryptic donor USAGE > 0.05 in slot: "
                   f"{100 * (df[uc] > 0.05).mean():5.1f} % of sequences")
-    if "junc_designed_frac" in df:
-        print("  -- junction competition (softplus counts; ratios only) --")
-        for col in ("junc_designed_frac", "junc_donor_leak",
-                    "junc_acceptor_leak", "junc_top_offpair_frac"):
+    if "psi" in df:
+        print("  -- junction flux (softplus counts; ratios only) --")
+        for col in ("psi", "junc_incl_asym", "junc_cryptic_frac",
+                    "junc_top_offpair_frac"):
             v = df[col]
             print(f"  {col:34s} median {v.median():.4f}  "
                   f"p05 {v.quantile(0.05):.4f}  p95 {v.quantile(0.95):.4f}")
-        print(f"  sequences where the designed pair carries < 50 % of flux: "
-              f"{100 * (df.junc_designed_frac < 0.5).mean():5.1f} %")
+        n_nan = int(df.psi.isna().sum())
+        if n_nan:
+            print(f"  psi is NaN (no predicted flux) in {n_nan:,} rows "
+                  f"({100 * n_nan / len(df):.1f} %) -- excluded above")
+        # the axes-transposed tripwire: this junction runs backwards
+        bw = df.junc_backwards / (df.junc_total + 1e-12)
+        print(f"  backwards junction share (expect ~0): max {bw.max():.2e}")
         if "logit_average" in df:
-            print(f"  corr(logit_average, junc_designed_frac)  = "
-                  f"{df.logit_average.corr(df.junc_designed_frac):+.4f}")
-            print(f"  corr(logit_average, junc_donor_leak)     = "
-                  f"{df.logit_average.corr(df.junc_donor_leak):+.4f}")
-        inslot = df.junc_top_offpair_donor_ctx.between(
-            *[int(x) for x in _slot_bounds(slot)])
+            print(f"  corr(logit_average, psi)                = "
+                  f"{df.logit_average.corr(df.psi):+.4f}")
+            print(f"  corr(logit_average, junc_cryptic_frac)  = "
+                  f"{df.logit_average.corr(df.junc_cryptic_frac):+.4f}")
+        lo, hi = _slot_bounds(slot)
+        inslot = df.junc_top_offpair_donor_ctx.between(lo, hi)
         print(f"  top competing donor lies INSIDE the variable slot: "
               f"{100 * inslot.mean():5.1f} % of sequences")
 

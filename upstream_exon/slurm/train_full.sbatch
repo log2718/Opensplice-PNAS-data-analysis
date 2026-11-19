@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=b1_full
-#SBATCH --account=torch_pr_352_general
+#SBATCH --account=torch_pr_352_courant
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=12:00:00
@@ -30,14 +30,14 @@
 # the cluster default partition. That is not a guess: the AlphaGenome scoring
 # and analysis jobs in this repo (run_tp53_wide_hybrids.sbatch,
 # run_chimera8_score.sbatch, run_synthetic_chimeras.sbatch, ...) all declare
-# only --account=torch_pr_352_general with no partition and no gres, and they
+# only --account=torch_pr_352_courant with no partition and no gres, and they
 # ran to completion on CPU nodes cs655 / cs667 / cs695 / cs787
 # (see the committed slurm-177*.out logs). The default partition therefore
 # accepts a CPU-only job from this account.
 #
 # `cpu_public` is NOT a partition on this cluster -- submitting to it fails
 # with "Error partition 'cpu_public' is not valid for this job". Note also
-# that torch_pr_352_general is a SLURM *account*, not a partition.
+# that torch_pr_352_courant is a SLURM *account*, not a partition.
 #
 # Requesting --partition=l40s_public --gres=gpu:l40s:1 also works, but it
 # reserves an L40S this job never touches (torch is a CPU-only build) and it

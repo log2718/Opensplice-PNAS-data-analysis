@@ -17,7 +17,7 @@
 
 set -uo pipefail
 
-ACCOUNT=${ACCOUNT:-torch_pr_352_general}
+ACCOUNT=${ACCOUNT:-torch_pr_352_courant}
 
 hr() { printf '\n%s\n%s\n' "$1" "$(printf '=%.0s' {1..70})"; }
 

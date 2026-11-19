@@ -160,7 +160,7 @@ python upstream_exon/build_b1_dataset_v2.py
 ### 2. SLURM resources
 
 The training job requests **no partition and no GPU** — only
-`--account=torch_pr_352_general` — so it lands on the cluster default
+`--account=torch_pr_352_courant` — so it lands on the cluster default
 partition. This is evidence-based, not assumed: every AlphaGenome scoring and
 analysis job in this repo (`run_tp53_wide_hybrids.sbatch`,
 `run_chimera8_score.sbatch`, `run_synthetic_chimeras.sbatch`, …) declares the
@@ -169,7 +169,7 @@ account alone, and those jobs ran to completion on CPU nodes
 
 Two things to keep straight:
 
-- `torch_pr_352_general` is a SLURM **account**, not a partition.
+- `torch_pr_352_courant` is a SLURM **account**, not a partition.
 - `cpu_public` is **not** a partition here — submission fails with
   `Error partition 'cpu_public' is not valid for this job`.
 

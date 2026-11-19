@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=b1_netcheck
-#SBATCH --account=torch_pr_352_general
+#SBATCH --account=torch_pr_352_courant
 #SBATCH --partition=l40s_public
 #SBATCH --gres=gpu:l40s:1
 #SBATCH --cpus-per-task=4

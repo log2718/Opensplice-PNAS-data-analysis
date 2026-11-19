@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=fullctx_build
-#SBATCH --account=torch_pr_352_general
+#SBATCH --account=torch_pr_352_courant
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=24G
 #SBATCH --time=02:00:00
