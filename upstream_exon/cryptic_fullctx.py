@@ -60,6 +60,12 @@ OUT = ROOT / "outputs" / "upstream_exon"
 #: probability thresholds the per-window counts are reported at
 THRESHOLDS = (0.01, 0.1, 0.5)
 
+#: tissues on the splice_junctions axis. pred_counts' last axis is
+#: cat([pos_counts, neg_counts]) = 2 x this (model.py:277), so strand is the
+#: AXIS, not a track attribute -- the catalogue's junction rows all carry
+#: strand '.' and track_index runs 0..366 over tissues alone.
+N_JUNCTION_TISSUES = 367
+
 #: non-designed candidate sites handed to the junction head, per role
 N_CANDIDATES = 7
 #: minimum separation between candidates, nt (crude non-max suppression, so
@@ -114,30 +120,61 @@ def resolve_splice_site_channels(catalog_path: str | Path) -> dict[str, int]:
 
 def resolve_junction_tissue(catalog_path: str | Path,
                             usage_index: int) -> tuple[int, str]:
-    """Plus-strand tissue index for CL:0002518 on the junction axis.
+    """Tissue index for CL:0002518 on the splice_junctions axis.
 
-    pred_counts' last axis is cat([pos_counts, neg_counts]), each 367 wide
-    (model.py:277). If the catalogue carries splice_junctions rows we resolve
-    the index from them; if it does not, we fall back to the usage index,
-    because both heads are built from the same 367-tissue ordering -- but we
-    say so out loud, because that is an inference, not a lookup.
+    DO NOT filter these rows by strand. pred_counts' last axis is
+    cat([pos_counts, neg_counts]), each N_JUNCTION_TISSUES wide
+    (model.py:277), so strand is carried by the axis and the catalogue's 367
+    junction rows all have strand '.'. An earlier version required
+    strand == '+', matched zero rows, and killed job 23717850 after a
+    passing preflight.
+
+    Verified against the v0.3.1 catalogue: CL:0002518 is junction track 71,
+    "junction_CL:0002518 total RNA-seq" -- numerically the same index the
+    usage head uses for its plus-strand track, so the old
+    inferred-from-usage-head fallback would have given the right answer.
+    We prefer the lookup anyway, and cross-check it against the inference,
+    because a silent disagreement would mean the two heads are ordered
+    differently and every PSI column would describe a different cell type
+    than logit_average does.
     """
     df = pd.read_parquet(catalog_path)
     jj = df[df.output_type == "splice_junctions"]
-    if len(jj):
-        hit = jj[(jj.ontology_curie.astype(str).str.replace("_", ":")
-                  == F.ONTOLOGY[0]) & (jj.strand == "+")]
-        if len(hit) == 1:
-            idx = int(hit.iloc[0].track_index)
-            if idx >= 367:
-                raise ValueError(
-                    f"junction plus-strand index {idx} is >= 367; the axis "
-                    f"layout is not what we assumed")
-            return idx, "catalogue"
+    if not len(jj):
+        return usage_index, "inferred-from-usage-head"
+
+    if len(jj) != N_JUNCTION_TISSUES:
         raise ValueError(
-            f"{len(hit)} splice_junctions rows matched {F.ONTOLOGY[0]} (+); "
-            f"expected exactly 1")
-    return usage_index, "inferred-from-usage-head"
+            f"catalogue has {len(jj)} splice_junctions rows, expected "
+            f"{N_JUNCTION_TISSUES}; this is not the axis layout the "
+            f"pred_counts unpacking assumes")
+
+    curie = jj.ontology_curie.astype(str).str.replace("_", ":", regex=False)
+    hit = jj[curie == F.ONTOLOGY[0]]
+    if len(hit) != 1:
+        raise ValueError(
+            f"{len(hit)} splice_junctions rows matched {F.ONTOLOGY[0]}, "
+            f"expected exactly 1. Junction tracks are UNSTRANDED (strand "
+            f"'.'); do not filter them by strand.\n"
+            f"{jj[['track_index', 'track_name', 'strand']].head(10).to_string(index=False)}")
+
+    idx = int(hit.iloc[0].track_index)
+    if not 0 <= idx < N_JUNCTION_TISSUES:
+        raise ValueError(
+            f"junction tissue index {idx} is outside "
+            f"[0, {N_JUNCTION_TISSUES})")
+
+    # The usage head is [367 plus][367 minus]; its plus-strand index IS the
+    # tissue ordinal. If the heads ever disagree, stop -- do not quietly
+    # score PSI in one cell type and the target in another.
+    if idx != usage_index % N_JUNCTION_TISSUES:
+        raise ValueError(
+            f"the junction catalogue puts {F.ONTOLOGY[0]} at tissue {idx}, "
+            f"but the usage head puts it at track {usage_index} "
+            f"(tissue {usage_index % N_JUNCTION_TISSUES}). The two heads are "
+            f"not ordered alike, so the PSI columns would describe a "
+            f"different cell type than the labels. Resolve before scanning.")
+    return idx, "catalogue"
 
 
 def pick_candidates(track, fixed: list[int], left_pad: int,
@@ -389,6 +426,23 @@ def main() -> int:
     for k in sorted(ch):
         print(f"    {k:16s} -> {ch[k]}")
 
+    # Resolve the junction tissue HERE, from the catalogue alone, so that
+    # --dry-run exercises it. Job 23717850 allocated an L40S, loaded 921 MB of
+    # weights and passed the entire preflight before dying on this lookup:
+    # 38 s of GPU to learn something a 5 s dry run can tell us. The usage
+    # index comes from the catalogue too; it is cross-checked against the
+    # loaded scorer's own index once the model exists.
+    tissue_idx = tissue_src = None
+    if not args.no_junctions:
+        tissue_idx, tissue_src = resolve_junction_tissue(
+            args.catalog, F.resolve_usage_track(args.catalog, strand="+"))
+        print(f"  junction tissue index {tissue_idx} ({tissue_src}), "
+              f"P = {2 + N_CANDIDATES} per role "
+              f"(2 designed + {N_CANDIDATES} cryptic)")
+        if tissue_src != "catalogue":
+            print("  NOTE: the catalogue has no splice_junctions rows, so "
+                  "this index is inferred from the usage head's ordering.")
+
     man = pd.read_csv(manifest, usecols=["row_id", slot, "split"])
     man["row_id"] = man.row_id.astype(str)
     samp = man.sample(n=min(args.n, len(man)), random_state=args.seed)
@@ -426,15 +480,17 @@ def main() -> int:
     sites = F.designed_sites(left_pad)
     print("  designed sites (ctx): "
           + "  ".join(f"{k}={v - left_pad}" for k, v in sites.items()))
-    tissue_idx = tissue_src = None
-    if not args.no_junctions:
-        tissue_idx, tissue_src = resolve_junction_tissue(
-            args.catalog, scorer.track_index)
-        print(f"  junction tissue index {tissue_idx} ({tissue_src}), "
-              f"P = {1 + N_CANDIDATES} per role")
-        if tissue_src != "catalogue":
-            print("  NOTE: the catalogue has no splice_junctions rows, so "
-                  "this index is inferred from the usage head's ordering.")
+    if tissue_idx is not None:
+        # The tissue was resolved from the catalogue before the model loaded.
+        # Now that the scorer exists, confirm it is scoring the same cell type
+        # the PSI columns will describe.
+        if tissue_idx != scorer.track_index % N_JUNCTION_TISSUES:
+            sys.exit(
+                f"FATAL: junction tissue {tissue_idx} disagrees with the "
+                f"scorer's usage track {scorer.track_index} "
+                f"(tissue {scorer.track_index % N_JUNCTION_TISSUES}). The "
+                f"PSI columns and logit_average would describe different "
+                f"cell types.")
 
     LB.write_provenance(scorer, dsdir / f"cryptic_provenance_{args.n}.json",
                         extra={"library": args.library, "slot": slot,
