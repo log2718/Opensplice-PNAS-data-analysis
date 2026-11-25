@@ -35,6 +35,9 @@ from pathlib import Path
 
 import pandas as pd
 
+#: v3 defaults. Both are overridable so the same exporter serves the v4
+#: full-context libraries, whose results CSVs carry b1/syn70 + logit_average
+#: in ONE file (no manifest join needed -- use --from-share).
 SEQ_COL = "b1"
 TGT_COL = "AG_mean_logit"
 SPLITS = ("train", "valid", "test")
@@ -43,10 +46,11 @@ _SPLIT_ALIASES = {"valid": ("valid", "val")}
 
 
 def load_rows(args: argparse.Namespace) -> pd.DataFrame:
-    """Rows with b1 / AG_mean_logit / split, from a share CSV or the raw pair."""
+    """Rows with <seq> / <target> / split, from a share CSV or the raw pair."""
+    seq_col, tgt_col = args.sequence_column, args.target_column
     if args.from_share:
         return pd.read_csv(args.from_share,
-                           usecols=[SEQ_COL, TGT_COL, "split"])
+                           usecols=[seq_col, tgt_col, "split"])
 
     man_p = args.dataset_dir / args.manifest
     res_p = args.dataset_dir / args.results
@@ -54,8 +58,8 @@ def load_rows(args: argparse.Namespace) -> pd.DataFrame:
         if not p.exists():
             sys.exit(f"FATAL: {p} not found")
 
-    man = pd.read_csv(man_p, usecols=["row_id", SEQ_COL, "split"])
-    res = pd.read_csv(res_p, usecols=["row_id", TGT_COL])
+    man = pd.read_csv(man_p, usecols=["row_id", seq_col, "split"])
+    res = pd.read_csv(res_p, usecols=["row_id", tgt_col])
     df = man.merge(res, on="row_id", how="inner", validate="one_to_one")
     print(f"joined {len(df):,} of {len(res):,} scored rows")
     if len(df) != len(res):
@@ -73,19 +77,34 @@ def main() -> int:
     ap.add_argument("--out-dir", type=Path, required=True)
     ap.add_argument("--manifest", default="b1_primary_manifest.csv")
     ap.add_argument("--results", default="b1_primary_ag_results.csv")
+    ap.add_argument("--sequence-column", default=SEQ_COL,
+                    help=f"default {SEQ_COL!r}; use 'syn70' for the middle "
+                         f"library")
+    ap.add_argument("--target-column", default=TGT_COL,
+                    help=f"default {TGT_COL!r}; use 'logit_average' for v4")
     ap.add_argument("--center", action="store_true",
                     help="subtract the train mean from every split's target")
+    ap.add_argument("--standardize", action="store_true",
+                    help="ALSO divide by the train sd. Required for the v4 "
+                         "libraries: the FNBM config's L2 penalties are "
+                         "absolute and were tuned at var(target) ~ 0.414, so "
+                         "an un-scaled target whose variance is 0.0021 "
+                         "(upstream) or 8.5 (middle) changes the effective "
+                         "regularization by 195x / 20x. R2 is scale-invariant "
+                         "and var_pop is written post-scaling, so the reported "
+                         "R2 is unaffected.")
     args = ap.parse_args()
+    seq_col, tgt_col = args.sequence_column, args.target_column
 
     df = load_rows(args)
-    df = df.dropna(subset=[SEQ_COL, TGT_COL])
+    df = df.dropna(subset=[seq_col, tgt_col])
 
-    lengths = sorted(df[SEQ_COL].str.len().unique())
+    lengths = sorted(df[seq_col].str.len().unique())
     if len(lengths) != 1:
         sys.exit(f"FATAL: sequences are not all one length: {lengths}")
-    bad = sorted(set("".join(df[SEQ_COL].head(2000))) - set("ACGTN"))
+    bad = sorted(set("".join(df[seq_col].head(2000))) - set("ACGTN"))
     if bad:
-        sys.exit(f"FATAL: non-ACGTN characters in b1: {bad}")
+        sys.exit(f"FATAL: non-ACGTN characters in {seq_col}: {bad}")
 
     parts: dict[str, pd.DataFrame] = {}
     for name in SPLITS:
@@ -97,33 +116,45 @@ def main() -> int:
 
     shift = 0.0
     if args.center:
-        shift = float(parts["train"][TGT_COL].mean())
+        shift = float(parts["train"][tgt_col].mean())
         print(f"centering: subtracting train mean {shift:.6f}")
+    scale = 1.0
+    if args.standardize:
+        # ddof=0 to match losses.r2's SST/n, and computed on TRAIN only -- the
+        # val/test sd must not leak into the transform.
+        scale = float(parts["train"][tgt_col].std(ddof=0))
+        if not scale > 0:
+            sys.exit(f"FATAL: train sd of {tgt_col} is {scale}; cannot scale")
+        print(f"standardizing: dividing by train sd {scale:.6f}")
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    meta = {"sequence_column": SEQ_COL, "target_column": TGT_COL,
+    meta = {"sequence_column": seq_col, "target_column": tgt_col,
             "input_length": int(lengths[0]), "center_shift": shift,
+            # multiply a prediction by this to return to target units
+            "target_scale": scale,
             "source": str(args.from_share or args.dataset_dir), "splits": {}}
 
     for name, part in parts.items():
-        out = part[[SEQ_COL, TGT_COL]].copy()
+        out = part[[seq_col, tgt_col]].copy()
         if shift:
-            out[TGT_COL] = out[TGT_COL] - shift
+            out[tgt_col] = out[tgt_col] - shift
+        if scale != 1.0:
+            out[tgt_col] = out[tgt_col] / scale
         dest = args.out_dir / f"{name}.csv"
         out.to_csv(dest, index=False)
         # var is the population variance: it is the SST/n that test R2 divides
         # by, so it has to match losses.r2's ddof=0, not pandas' default 1.
-        v = float(out[TGT_COL].var(ddof=0))
-        meta["splits"][name] = {"n": len(out), "mean": float(out[TGT_COL].mean()),
+        v = float(out[tgt_col].var(ddof=0))
+        meta["splits"][name] = {"n": len(out), "mean": float(out[tgt_col].mean()),
                                 "var_pop": v}
-        print(f"{name:5s} {len(out):>7,} rows  mean {out[TGT_COL].mean():+.4f}  "
+        print(f"{name:5s} {len(out):>7,} rows  mean {out[tgt_col].mean():+.4f}  "
               f"var {v:.6f}  -> {dest}")
 
     meta_p = args.out_dir / "export_meta.json"
     meta_p.write_text(json.dumps(meta, indent=2) + "\n")
     print(f"wrote {meta_p}")
     print(f"\nset in the config:  input_length: {lengths[0]}   "
-          f"sequence_column: {SEQ_COL}   target_column: {TGT_COL}")
+          f"sequence_column: {seq_col}   target_column: {tgt_col}")
     print(f"test R2 will be:    1 - test_loss / {meta['splits']['test']['var_pop']:.6f}")
     return 0
 

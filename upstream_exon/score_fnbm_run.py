@@ -56,16 +56,25 @@ def main() -> int:
     pearson = float(row["test_pearson_r"])
     best_epoch = row.get("best_epoch", "?")
 
+    meta = json.loads(args.export_meta.read_text())
     if args.var is not None:
         var = args.var
     else:
-        meta = json.loads(args.export_meta.read_text())
         var = float(meta["splits"]["test"]["var_pop"])
+    # 1.0 for every v3 run (the key did not exist then) and for any export made
+    # without --standardize, so this changes nothing for those.
+    scale = float(meta.get("target_scale", 1.0))
 
     r2 = 1.0 - test_loss / var
 
     print(f"run        : {args.run_dir.name}  (best epoch {best_epoch})")
     print(f"test MSE   : {test_loss:.6f}   over var_pop {var:.6f}")
+    if scale != 1.0:
+        # The target was standardized, so test_loss is in units of train sd^2.
+        # R2 is unaffected, but the MSE is not comparable to the v3 table.
+        print(f"           : {test_loss * scale ** 2:.8f}   in TARGET units "
+              f"(x target_scale^2, scale {scale:.6f})")
+        print(f"           : RMSE {test_loss ** 0.5 * scale:.6f} logit units")
     print(f"test R2    : {r2:+.4f}")
     print(f"test r     : {pearson:+.4f}   (r^2 = {pearson ** 2:.4f})")
     # r2 < r^2 is the signature of a miscalibrated slope or offset rather than
@@ -74,6 +83,9 @@ def main() -> int:
         print(f"note: r^2 exceeds R2 by {pearson ** 2 - r2:.4f}; the "
               f"predictions correlate better than they calibrate")
 
+    if scale != 1.0:
+        print("\nreference below is v3 (AG_mean_logit, 1,309-nt cassette): its "
+              "MSE column is in DIFFERENT units -- compare R2 only.")
     print("\n%-30s %10s %8s" % ("model", "test MSE", "test R2"))
     for name, mse, ref_r2 in REFERENCE:
         print("%-30s %10.6f %+8.4f" % (name, mse, ref_r2))

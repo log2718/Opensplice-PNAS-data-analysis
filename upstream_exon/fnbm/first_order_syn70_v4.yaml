@@ -1,0 +1,203 @@
+# First-order PositionalFactorizedNBM on the v4 FULL-CONTEXT middle library.
+#
+# Same architecture, penalties and Muon settings as first_order_b1_v3.yaml,
+# which are Arush's verbatim. Only the task wiring changed.
+#
+# WHAT CHANGED FROM v3, and why each matters:
+#
+#  * target  AG_mean_logit -> logit_average = logit((u_acc + u_don) / 2).
+#    The professor's single target. Never pool the two: on (0.9, 0.5) the new
+#    metric gives 0.847 and the old 1.099.
+#  * context 1,309-nt cassette -> the full 8,612-nt plasmid, padded to 16,384.
+#  * n       250,000 -> 400,000 train rows.
+#  * slot    syn70 (70 nt), even-composition permutation.
+#
+# THE TARGET IS STANDARDIZED. export_fnbm_csv.py --center --standardize
+# divides by the TRAIN sd (2.918), because every penalty below is an
+# absolute weight penalty tuned at var(target) ~ 0.414. Raw, this library's
+# variance would change the effective regularization by a large factor and
+# the model would be driven toward a constant. R2 = 1 - MSE / var_pop is
+# scale-invariant and export_meta.json records var_pop AFTER scaling, so
+# score_fnbm_run.py still reports the right number. Multiply a prediction by
+# export_meta.json's target_scale to return to logit units.
+#
+# checkpoint_every is 2, not 10: these runs are chained in 4 h array tasks
+# and resume from the newest checkpoint, so 10 epochs of resume granularity
+# would throw away most of a task.
+#
+# No v3 baseline applies to this target. score_fnbm_run.py still prints the
+# v3 reference table; ignore its MSE column (different units) and compare R2.
+
+run:
+  name: fnbm_o1_syn70_v4
+  output_dir: /scratch/yl12316/results/upstream-exon-fnbm   # EDIT if your scratch differs
+  num_epochs: 100
+  checkpoint_every: 2
+  jobs_per_gpu: 1
+  seed: 0
+
+data:
+  # CHANGED: written by upstream_exon/export_fnbm_csv.py.
+  train_csv: /scratch/yl12316/data/fnbm_middle_500k/train.csv
+  # CHANGED: an explicit valid_csv, NOT valid_fraction. valid_fraction would
+  # carve a fresh random split out of train_csv per run.seed, so the number
+  # would stop being comparable to the CNN / ridge / BiLSTM runs, which all
+  # use this exact 10,000-row validation set.
+  valid_csv: /scratch/yl12316/data/fnbm_middle_500k/valid.csv
+  test_csv:  /scratch/yl12316/data/fnbm_middle_500k/test.csv
+  target_column: logit_average    # CHANGED: the v4 target, standardized
+  sequence_column: syn70           # CHANGED: the permuted slot
+  # No flanks. Everything outside the syn70 slot is byte-identical across all
+  # 400,000 rows, so a constant prefix/suffix would add nothing a filter can use.
+  batch_size: 128
+  num_workers: 2
+  pin_memory: true
+  persistent_workers: true
+
+training:
+  # CHANGED from logit_kl_divergence. That loss applies a sigmoid and needs a
+  # target in [0, 1]; ours is a standardized logit, mean 0 and unit variance on
+  # train. mse is already in his LOSSES registry and has no EVAL_TRANSFORMS
+  # entry, so the output stays a raw scalar and test_loss is an MSE in
+  # standardized units -- divide by var_pop for R2.
+  loss: mse
+  loss_kwargs: {}
+  optimizer: muon
+  # Adam group.
+  init_lr: 0.001
+  min_lr: 1.0e-08
+  weight_decay: 0.0
+  # Muon group.
+  muon_init_lr: 0.001
+  muon_min_lr: 1.0e-08
+  muon_momentum: 0.95
+  muon_weight_decay: 0.014925284855736602
+  lr_scheme: cosine_warm_restarts
+  lr_warmup_steps: 2000
+  lr_restart_period: 11
+  lr_restart_mult: 1
+  lr_decay_factor: 0.5
+  lr_decay_patience: 10
+  early_stopping_patience: 22
+  grad_accum_steps: 2             # effective batch 256
+  gradient_clip: null
+  amp: false
+
+model:
+  class: PositionalFactorizedNBM
+  file: /scratch/yl12316/factorized-model-iterations/models/fnbm/positional_model.py  # EDIT: your checkout
+  kwargs:
+    orders: [[1, null]]
+    order_start_epoch: {'1': 0}
+    input_length: 70              # the syn70 slot length
+    sequence_channels: 4
+    sequence_kernels: [[64, 7]]
+    padding: same
+    pooling: null
+    pooling_size: null
+    conv_activation: relu
+    conv_batch_norm: false
+    filter_transform_type: basis
+    filter_transform_hidden_num: 1
+    filter_transform_hidden_size: 32
+    filter_transform_activation: gelu
+    filter_transform_norm: none
+    positional_hidden_num: 2
+    positional_hidden_size: 64
+    positional_activation: relu
+    positional_norm: none
+    position_num_fourier: 8
+    # 200 > input_length 70, as his comment requires. Left alone.
+    position_fourier_max_period: 200.0
+    position_fourier_min_period: 5.0
+    disable_tuner: false
+    tuner_residual: true
+    tuner_hidden_num: 2
+    tuner_hidden_size: 64
+    tuner_hidden_activation: relu
+    tuner_hidden_norm: none
+    output_size: 1
+    output_activations: [none]
+    conv_kernel_l2_penalty: 0.0001
+    feature_nn_weight_l2_penalty: 1.0e-05
+    positional_feature_l2_penalty: 0.001
+    positional_kernel_smoothness_penalty: 0.0001
+    magnitude_l2_penalty: 0.0
+    first_order_contribution_l1_penalty: 0.0
+    tuner_l2_penalty: 0.0
+
+log_extra:
+  grad_norm: true
+  reg_penalties: true
+
+wandb:
+  enabled: false
+  project: alphagenome-splicing
+  entity: null
+  tags: ["first-order", "positional", "muon", "fullctx-v4", "syn70-v4-fullctx"]
+
+interpret:
+  every_k_epochs: 20
+  final_report_kwargs:
+    output_idx: 0
+    max_batches: 100
+    kmer_source: validation
+    num_sequences: 500000
+    batch_size: 2048
+    seed: 42
+    pwm_top_frac: 0.2
+    interaction_top_k: 12
+    length_normalize: true
+    n_points: 500
+    dedup_top_k: 25
+    dedup_ncols: 3
+    run_tuner: true
+    run_validation: true
+    run_dedup: true
+    run_ablation: true
+    ablation_mode: shuffle
+    ablation_seed: 0
+    run_submission: false
+    dedup_kwargs: &dedup
+      # Unchanged. syn70 is exon body, so like his PSI exons it is
+      # single-stranded transcript sequence (written with T), and
+      # reverse-complement merging stays off.
+      alphabet_mode: RNA
+      reverse_complement: false
+      grouping: correlation
+      correlation_min: 0.5
+      max_batches: 50
+      eps_dead: 1.0e-03
+      ic_min: 2.0
+      ic_pos: 0.25
+      gauge_quantile: 99.9
+      sign_tol: 1.0e-06
+      occurrence_samples: 2000
+      strength_lag_radius: null
+      kmer_seed: 42
+      scan_batch_size: 2048
+      p_max: 0.01
+      coherence_min: 0.8
+  hooks:
+    - enabled: true
+      file: /scratch/yl12316/factorized-model-iterations/hooks/fnbm_standard_interpret.py  # EDIT: your checkout
+      function: run_interpretation
+      kwargs:
+        output_idx: 0
+        max_batches: 50
+        kmer_source: validation
+        num_sequences: 500000
+        batch_size: 2048
+        seed: 42
+        pwm_top_frac: 0.2
+        interaction_top_k: 12
+        length_normalize: true
+        n_points: 500
+        dedup_top_k: 25
+        dedup_ncols: 3
+        run_tuner: true
+        run_validation: true
+        run_dedup: true
+        run_ablation: false
+        run_submission: false
+        dedup_kwargs: *dedup
