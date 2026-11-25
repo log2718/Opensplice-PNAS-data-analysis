@@ -5,7 +5,11 @@
 #   torch_pr_352_courant; only this one was moved, to get the v4 chain
 #   scheduled. Do not treat mren as the new default.
 #SBATCH --partition=l40s_public
-#SBATCH --gres=gpu:l40s:1
+#SBATCH --gres=gpu:1
+# ^ GENERIC, not gpu:l40s:1. A typed gres is rejected outright on any
+#   partition without that GPU model ("Error: GPU job setup is not
+#   valid"), which blocks --partition=b200_mren,b200_courant,l40s_public.
+#   Nothing here needs an L40S specifically.
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
 #SBATCH --time=02:00:00

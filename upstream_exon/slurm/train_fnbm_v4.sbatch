@@ -60,6 +60,11 @@ LIBRARY=${LIBRARY:?set LIBRARY=upstream or LIBRARY=middle}
 SEED=${SEED:-0}
 EPOCHS=${EPOCHS:-}
 SUBSAMPLE=${SUBSAMPLE:-}
+# Override the config's checkpoint_every. Arush's loop has NO SIGUSR1 handler
+# -- unlike our scorer, it is SIGKILLed at the wall and loses everything since
+# the last checkpoint. With short tasks that matters: set CKPT_EVERY=1 when
+# running --time=01:00:00 so a wall-kill costs at most one epoch.
+CKPT_EVERY=${CKPT_EVERY:-}
 NO_TRITON=${NO_TRITON:-1}
 PYTHON_BIN=${PYTHON_BIN:-/scratch/yl12316/envs/fnbm/bin/python}
 
@@ -127,7 +132,23 @@ import torch
 print(f"torch {torch.__version__}  cuda_available={torch.cuda.is_available()}")
 if not torch.cuda.is_available():
     sys.exit("FATAL: no CUDA device visible to this interpreter.")
-print(torch.cuda.get_device_name(0))
+cap = torch.cuda.get_device_capability(0)
+print(f"{torch.cuda.get_device_name(0)}  sm_{cap[0]}{cap[1]}")
+# Actually RUN a kernel. get_device_name() succeeds on a GPU whose compute
+# capability this torch build has no kernels for -- a B200 is sm_100 and needs
+# torch >= 2.7 / CUDA >= 12.8. Without this, the run dies at the first training
+# step with "no kernel image is available for execution on the device", after
+# the export and the dataset one-hot have already been paid for.
+try:
+    _a = torch.randn(256, 256, device="cuda")
+    _ = (_a @ _a).sum().item()
+    torch.cuda.synchronize()
+    print("cuda kernels: OK")
+except Exception as exc:
+    sys.exit(f"FATAL: this torch cannot run kernels on sm_{cap[0]}{cap[1]} "
+             f"({type(exc).__name__}: {exc}). torch {torch.__version__} is too "
+             f"old for this GPU -- submit to an l40s partition instead, or "
+             f"point PYTHON_BIN at a newer torch.")
 try:
     from triton.runtime import driver
     _ = driver.active.utils
@@ -176,9 +197,10 @@ PY
 # --- this run's config: our YAML with name/seed/paths applied --------------
 CELL=${SLURM_TMPDIR:-/tmp}/fnbm_cell_${SLURM_JOB_ID:-0}_${SLURM_ARRAY_TASK_ID:-0}.yaml
 "$PYTHON_BIN" - "$CONFIG" "$CELL" "$RUN_NAME" "$SEED" "$DATA_DIR" "$OUT_DIR" \
-               "$FNBM_REPO" "$EPOCHS" "$SUBSAMPLE" <<'PY'
+               "$FNBM_REPO" "$EPOCHS" "$SUBSAMPLE" "$CKPT_EVERY" <<'PY'
 import sys, yaml
-_, src, dest, run_name, seed, data_dir, out_dir, fnbm, epochs, subsample = sys.argv
+(_, src, dest, run_name, seed, data_dir, out_dir, fnbm, epochs, subsample,
+ ckpt_every) = sys.argv
 c = yaml.safe_load(open(src))
 c["run"]["name"], c["run"]["seed"] = run_name, int(seed)
 c["run"]["output_dir"] = out_dir
@@ -194,6 +216,8 @@ if epochs:
 if subsample:
     c["data"]["train_subsample_n"] = int(subsample)
     c["data"]["train_subsample_seed"] = 0
+if ckpt_every:
+    c["run"]["checkpoint_every"] = int(ckpt_every)
 yaml.safe_dump(c, open(dest, "w"), sort_keys=False)
 print(f"wrote {dest}  (num_epochs={c['run']['num_epochs']}, "
       f"checkpoint_every={c['run']['checkpoint_every']}, "
