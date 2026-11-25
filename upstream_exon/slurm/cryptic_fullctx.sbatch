@@ -1,6 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=cryptic_fullctx
-#SBATCH --account=torch_pr_352_courant
+#SBATCH --account=torch_pr_36_mren
+# ^ ONE-OFF, 2026-11-25. Every other script in this directory stays on
+#   torch_pr_352_courant; only this one was moved, to get the v4 chain
+#   scheduled. Do not treat mren as the new default.
 #SBATCH --partition=l40s_public
 #SBATCH --gres=gpu:l40s:1
 #SBATCH --cpus-per-task=8
