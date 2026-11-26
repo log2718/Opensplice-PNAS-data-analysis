@@ -65,6 +65,13 @@ SUBSAMPLE=${SUBSAMPLE:-}
 # the last checkpoint. With short tasks that matters: set CKPT_EVERY=1 when
 # running --time=01:00:00 so a wall-kill costs at most one epoch.
 CKPT_EVERY=${CKPT_EVERY:-}
+# Capacity / regularization sweep knobs. The v4 runs came back with val loss
+# BELOW train loss (-0.015 upstream, -0.012 middle) and 15/64 conv filters at
+# near-zero norm: the model underfits and the penalties are killing filters.
+# These override the config so a sweep needs no new YAML. Empty = use the file.
+CONV_L2=${CONV_L2:-}          # conv_kernel_l2_penalty      (config 1e-4)
+POS_L2=${POS_L2:-}            # positional_feature_l2_penalty (config 1e-3)
+FILTERS=${FILTERS:-}          # sequence_kernels [[N, 7]]   (config 64)
 NO_TRITON=${NO_TRITON:-1}
 PYTHON_BIN=${PYTHON_BIN:-/scratch/yl12316/envs/fnbm/bin/python}
 
@@ -197,10 +204,11 @@ PY
 # --- this run's config: our YAML with name/seed/paths applied --------------
 CELL=${SLURM_TMPDIR:-/tmp}/fnbm_cell_${SLURM_JOB_ID:-0}_${SLURM_ARRAY_TASK_ID:-0}.yaml
 "$PYTHON_BIN" - "$CONFIG" "$CELL" "$RUN_NAME" "$SEED" "$DATA_DIR" "$OUT_DIR" \
-               "$FNBM_REPO" "$EPOCHS" "$SUBSAMPLE" "$CKPT_EVERY" <<'PY'
+               "$FNBM_REPO" "$EPOCHS" "$SUBSAMPLE" "$CKPT_EVERY" \
+               "$CONV_L2" "$POS_L2" "$FILTERS" <<'PY'
 import sys, yaml
 (_, src, dest, run_name, seed, data_dir, out_dir, fnbm, epochs, subsample,
- ckpt_every) = sys.argv
+ ckpt_every, conv_l2, pos_l2, filters) = sys.argv
 c = yaml.safe_load(open(src))
 c["run"]["name"], c["run"]["seed"] = run_name, int(seed)
 c["run"]["output_dir"] = out_dir
@@ -218,6 +226,16 @@ if subsample:
     c["data"]["train_subsample_seed"] = 0
 if ckpt_every:
     c["run"]["checkpoint_every"] = int(ckpt_every)
+kw = c["model"]["kwargs"]
+if conv_l2:
+    kw["conv_kernel_l2_penalty"] = float(conv_l2)
+if pos_l2:
+    kw["positional_feature_l2_penalty"] = float(pos_l2)
+if filters:
+    kw["sequence_kernels"] = [[int(filters), kw["sequence_kernels"][0][1]]]
+print(f"  model: sequence_kernels={kw['sequence_kernels']}  "
+      f"conv_l2={kw['conv_kernel_l2_penalty']}  "
+      f"pos_l2={kw['positional_feature_l2_penalty']}")
 yaml.safe_dump(c, open(dest, "w"), sort_keys=False)
 print(f"wrote {dest}  (num_epochs={c['run']['num_epochs']}, "
       f"checkpoint_every={c['run']['checkpoint_every']}, "
