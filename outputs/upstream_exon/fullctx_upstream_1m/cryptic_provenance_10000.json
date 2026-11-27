@@ -1,0 +1,67 @@
+{
+  "backend": "local",
+  "package_version": "0.3.1",
+  "weights": "/scratch/yl12316/models/alphagenome/model_all_folds.safetensors",
+  "weights_sha256_prefix": "2da883a51ddcd437",
+  "catalog_sha256": "ca3aa278a0b8fb890eb8d5b20f29f9ba9bf6b55a2b14825660d2697e3fad899e",
+  "track_index_plus": 71,
+  "track_index_minus": 438,
+  "ontology": "CL:0002518",
+  "head": "splice_site_usage",
+  "designed_sites_padded": {
+    "upstream_donor": 9886,
+    "middle_acceptor": 10014,
+    "middle_donor": 10089,
+    "downstream_acceptor": 10940
+  },
+  "site_order": [
+    "middle_acceptor",
+    "middle_donor",
+    "upstream_donor",
+    "downstream_acceptor"
+  ],
+  "acceptor_padded": 10014,
+  "donor_padded": 10089,
+  "target_len": 16384,
+  "batch_size": 16,
+  "compute_dtype": "torch.float32",
+  "device": "cuda",
+  "library": "upstream",
+  "slot": "b1",
+  "n_sampled": 10000,
+  "sample_seed": 20261117,
+  "splice_site_channels": {
+    "donor_plus": 0,
+    "acceptor_plus": 1,
+    "donor_minus": 2,
+    "acceptor_minus": 3
+  },
+  "thresholds": [
+    0.01,
+    0.1,
+    0.5
+  ],
+  "junctions": true,
+  "junction_tissue_index": 71,
+  "junction_tissue_source": "catalogue",
+  "n_candidates": 7,
+  "designed_sites_ctx": {
+    "upstream_donor": 6000,
+    "middle_acceptor": 6128,
+    "middle_donor": 6203,
+    "downstream_acceptor": 7054
+  },
+  "nms_window": 20,
+  "preflight": {
+    "native_acceptor_plus": 0.9968166947364807,
+    "native_donor_plus": 0.9830312728881836,
+    "native_acceptor_minus": 2.674871575436555e-05,
+    "native_donor_minus": 7.641245247214101e-06,
+    "native_logit_average": 4.587470191106619,
+    "track_max": 0.9968166947364807,
+    "track_median": 9.691216007468029e-08,
+    "acceptor_rank_of_16384": 1,
+    "donor_rank_of_16384": 5,
+    "problems": []
+  }
+}
