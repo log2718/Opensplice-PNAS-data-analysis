@@ -1,0 +1,160 @@
+data:
+  batch_size: 128
+  num_workers: 2
+  persistent_workers: true
+  pin_memory: true
+  sequence_column: syn70
+  target_column: logit_average
+  test_csv: /scratch/yl12316/data/fnbm_middle_500k/test.csv
+  train_csv: /scratch/yl12316/data/fnbm_middle_500k/train.csv
+  valid_csv: /scratch/yl12316/data/fnbm_middle_500k/valid.csv
+interpret:
+  every_k_epochs: 20
+  final_report_kwargs:
+    ablation_mode: shuffle
+    ablation_seed: 0
+    batch_size: 2048
+    dedup_kwargs: &id001
+      alphabet_mode: RNA
+      coherence_min: 0.8
+      correlation_min: 0.5
+      eps_dead: 0.001
+      gauge_quantile: 99.9
+      grouping: correlation
+      ic_min: 2.0
+      ic_pos: 0.25
+      kmer_seed: 42
+      max_batches: 50
+      occurrence_samples: 2000
+      p_max: 0.01
+      reverse_complement: false
+      scan_batch_size: 2048
+      sign_tol: 1.0e-06
+      strength_lag_radius: null
+    dedup_ncols: 3
+    dedup_top_k: 25
+    interaction_top_k: 12
+    kmer_source: validation
+    length_normalize: true
+    max_batches: 100
+    n_points: 500
+    num_sequences: 500000
+    output_idx: 0
+    pwm_top_frac: 0.2
+    run_ablation: true
+    run_dedup: true
+    run_submission: false
+    run_tuner: true
+    run_validation: true
+    seed: 42
+  hooks:
+  - enabled: true
+    file: /scratch/yl12316/factorized-model-iterations/hooks/fnbm_standard_interpret.py
+    function: run_interpretation
+    kwargs:
+      batch_size: 2048
+      dedup_kwargs: *id001
+      dedup_ncols: 3
+      dedup_top_k: 25
+      interaction_top_k: 12
+      kmer_source: validation
+      length_normalize: true
+      max_batches: 50
+      n_points: 500
+      num_sequences: 500000
+      output_idx: 0
+      pwm_top_frac: 0.2
+      run_ablation: false
+      run_dedup: true
+      run_submission: false
+      run_tuner: true
+      run_validation: true
+      seed: 42
+log_extra:
+  grad_norm: true
+  reg_penalties: true
+model:
+  class: PositionalFactorizedNBM
+  file: /scratch/yl12316/factorized-model-iterations/models/fnbm/positional_model.py
+  kwargs:
+    conv_activation: relu
+    conv_batch_norm: false
+    conv_kernel_l2_penalty: 0.0001
+    disable_tuner: false
+    feature_nn_weight_l2_penalty: 1.0e-05
+    filter_transform_activation: gelu
+    filter_transform_hidden_num: 1
+    filter_transform_hidden_size: 32
+    filter_transform_norm: none
+    filter_transform_type: basis
+    first_order_contribution_l1_penalty: 0.0
+    input_length: 70
+    magnitude_l2_penalty: 0.0
+    order_start_epoch:
+      '1': 0
+    orders:
+    - - 1
+      - null
+    output_activations:
+    - none
+    output_size: 1
+    padding: same
+    pooling: null
+    pooling_size: null
+    position_fourier_max_period: 200.0
+    position_fourier_min_period: 5.0
+    position_num_fourier: 8
+    positional_activation: relu
+    positional_feature_l2_penalty: 0.001
+    positional_hidden_num: 2
+    positional_hidden_size: 64
+    positional_kernel_smoothness_penalty: 0.0001
+    positional_norm: none
+    sequence_channels: 4
+    sequence_kernels:
+    - - 64
+      - 7
+    tuner_hidden_activation: relu
+    tuner_hidden_norm: none
+    tuner_hidden_num: 2
+    tuner_hidden_size: 64
+    tuner_l2_penalty: 0.0
+    tuner_residual: true
+run:
+  checkpoint_every: 2
+  jobs_per_gpu: 1
+  name: fnbm_o1_syn70_v4
+  num_epochs: 100
+  output_dir: /scratch/yl12316/results/upstream-exon-fnbm
+  seed: 0
+training:
+  amp: false
+  early_stopping_patience: 22
+  grad_accum_steps: 2
+  gradient_clip: null
+  init_lr: 0.001
+  loss: mse
+  loss_kwargs: {}
+  lr_decay_factor: 0.5
+  lr_decay_patience: 10
+  lr_restart_mult: 1
+  lr_restart_period: 11
+  lr_scheme: cosine_warm_restarts
+  lr_warmup_steps: 2000
+  min_lr: 1.0e-08
+  muon_init_lr: 0.001
+  muon_min_lr: 1.0e-08
+  muon_momentum: 0.95
+  muon_weight_decay: 0.014925284855736602
+  optimizer: muon
+  weight_decay: 0.0
+wandb:
+  enabled: false
+  entity: null
+  project: alphagenome-splicing
+  tags:
+  - first-order
+  - positional
+  - muon
+  - fullctx-v4
+  - syn70-v4-fullctx

@@ -1,0 +1,1412 @@
+{
+  "diagnostics": {
+    "n_clusters": 25,
+    "n_filters": 64,
+    "n_struct_filters": 0,
+    "n_dead": 10,
+    "n_uninformative": 26,
+    "n_pairing_unresolved": 0
+  },
+  "clusters": [
+    {
+      "cluster_id": 0,
+      "label": "motif_0",
+      "members": [
+        0
+      ],
+      "reference_filter": 0,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 2,
+      "core_end": 7,
+      "core_fraction": 0.7142857142857143,
+      "core_width": 5,
+      "effect": -0.0015007605930405829,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 0,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 1,
+      "label": "motif_1",
+      "members": [
+        3,
+        62
+      ],
+      "reference_filter": 62,
+      "coherence": 0.8819765245841467,
+      "coherence_balanced": 0.8805676962423242,
+      "core_start": 1,
+      "core_end": 6,
+      "core_fraction": 0.7142857142857143,
+      "core_width": 5,
+      "effect": 0.0033226224392505707,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 1,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 2,
+      "label": "motif_2",
+      "members": [
+        5,
+        24
+      ],
+      "reference_filter": 24,
+      "coherence": 0.8342600970442275,
+      "coherence_balanced": 0.8213797151361569,
+      "core_start": 1,
+      "core_end": 5,
+      "core_fraction": 0.5714285714285714,
+      "core_width": 4,
+      "effect": -0.0026742070768863914,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 2,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 3,
+      "label": "motif_3",
+      "members": [
+        8
+      ],
+      "reference_filter": 8,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 0,
+      "core_end": 7,
+      "core_fraction": 1.0,
+      "core_width": 7,
+      "effect": 0.0005441169539807233,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 3,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 4,
+      "label": "motif_4",
+      "members": [
+        9
+      ],
+      "reference_filter": 9,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 0,
+      "core_end": 5,
+      "core_fraction": 0.7142857142857143,
+      "core_width": 5,
+      "effect": 0.0011019028909469617,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 4,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 5,
+      "label": "motif_5",
+      "members": [
+        10,
+        30
+      ],
+      "reference_filter": 10,
+      "coherence": 0.8615177629222398,
+      "coherence_balanced": 0.850969046686994,
+      "core_start": 2,
+      "core_end": 6,
+      "core_fraction": 0.5714285714285714,
+      "core_width": 4,
+      "effect": -0.0014392910294386586,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 5,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 6,
+      "label": "motif_6",
+      "members": [
+        11
+      ],
+      "reference_filter": 11,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 1,
+      "core_end": 4,
+      "core_fraction": 0.42857142857142855,
+      "core_width": 3,
+      "effect": -0.0073404574899599345,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 6,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 7,
+      "label": "motif_7",
+      "members": [
+        12
+      ],
+      "reference_filter": 12,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 1,
+      "core_end": 6,
+      "core_fraction": 0.7142857142857143,
+      "core_width": 5,
+      "effect": 0.0022365653791506027,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 7,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 8,
+      "label": "motif_8",
+      "members": [
+        14
+      ],
+      "reference_filter": 14,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 0,
+      "core_end": 5,
+      "core_fraction": 0.7142857142857143,
+      "core_width": 5,
+      "effect": -0.0012608053003701585,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 8,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 9,
+      "label": "motif_9",
+      "members": [
+        18
+      ],
+      "reference_filter": 18,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 1,
+      "core_end": 6,
+      "core_fraction": 0.7142857142857143,
+      "core_width": 5,
+      "effect": -0.0018560880940609837,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 9,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 10,
+      "label": "motif_10",
+      "members": [
+        20
+      ],
+      "reference_filter": 20,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 2,
+      "core_end": 5,
+      "core_fraction": 0.42857142857142855,
+      "core_width": 3,
+      "effect": -0.0022772017821342822,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 10,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 11,
+      "label": "motif_11",
+      "members": [
+        25
+      ],
+      "reference_filter": 25,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 2,
+      "core_end": 7,
+      "core_fraction": 0.7142857142857143,
+      "core_width": 5,
+      "effect": -0.00035008464821010616,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 11,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 12,
+      "label": "motif_12",
+      "members": [
+        27
+      ],
+      "reference_filter": 27,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 0,
+      "core_end": 3,
+      "core_fraction": 0.42857142857142855,
+      "core_width": 3,
+      "effect": 0.00044383677813446926,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 12,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 13,
+      "label": "motif_13",
+      "members": [
+        28
+      ],
+      "reference_filter": 28,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 0,
+      "core_end": 6,
+      "core_fraction": 0.8571428571428571,
+      "core_width": 6,
+      "effect": 0.0017566092089577104,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 13,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 14,
+      "label": "motif_14",
+      "members": [
+        31
+      ],
+      "reference_filter": 31,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 4,
+      "core_end": 7,
+      "core_fraction": 0.42857142857142855,
+      "core_width": 3,
+      "effect": -0.0011471140249241433,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 14,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 15,
+      "label": "motif_15",
+      "members": [
+        32
+      ],
+      "reference_filter": 32,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 2,
+      "core_end": 5,
+      "core_fraction": 0.42857142857142855,
+      "core_width": 3,
+      "effect": -0.0006926323969953444,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 15,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 16,
+      "label": "motif_16",
+      "members": [
+        38
+      ],
+      "reference_filter": 38,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 0,
+      "core_end": 7,
+      "core_fraction": 1.0,
+      "core_width": 7,
+      "effect": -0.002340630475902671,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 16,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 17,
+      "label": "motif_17",
+      "members": [
+        39
+      ],
+      "reference_filter": 39,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 0,
+      "core_end": 5,
+      "core_fraction": 0.7142857142857143,
+      "core_width": 5,
+      "effect": -0.00240980980924262,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 17,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 18,
+      "label": "motif_18",
+      "members": [
+        41
+      ],
+      "reference_filter": 41,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 3,
+      "core_end": 7,
+      "core_fraction": 0.5714285714285714,
+      "core_width": 4,
+      "effect": 0.004272167415203202,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 18,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 19,
+      "label": "motif_19",
+      "members": [
+        42
+      ],
+      "reference_filter": 42,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 1,
+      "core_end": 7,
+      "core_fraction": 0.8571428571428571,
+      "core_width": 6,
+      "effect": -0.0006823095187121666,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 19,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 20,
+      "label": "motif_20",
+      "members": [
+        44
+      ],
+      "reference_filter": 44,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 0,
+      "core_end": 7,
+      "core_fraction": 1.0,
+      "core_width": 7,
+      "effect": -0.0008235129349313944,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 20,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 21,
+      "label": "motif_21",
+      "members": [
+        45
+      ],
+      "reference_filter": 45,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 4,
+      "core_end": 6,
+      "core_fraction": 0.2857142857142857,
+      "core_width": 2,
+      "effect": 0.0007454699042461772,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 21,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 22,
+      "label": "motif_22",
+      "members": [
+        46
+      ],
+      "reference_filter": 46,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 1,
+      "core_end": 7,
+      "core_fraction": 0.8571428571428571,
+      "core_width": 6,
+      "effect": 0.0012560909856806188,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 22,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 23,
+      "label": "motif_23",
+      "members": [
+        47
+      ],
+      "reference_filter": 47,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 4,
+      "core_end": 7,
+      "core_fraction": 0.42857142857142855,
+      "core_width": 3,
+      "effect": -0.0010287687987964621,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 23,
+      "is_struct": false
+    },
+    {
+      "cluster_id": 24,
+      "label": "motif_24",
+      "members": [
+        50
+      ],
+      "reference_filter": 50,
+      "coherence": 1.0,
+      "coherence_balanced": 1.0,
+      "core_start": 0,
+      "core_end": 5,
+      "core_fraction": 0.7142857142857143,
+      "core_width": 5,
+      "effect": -0.0008376577034357459,
+      "rc_partner_cluster": null,
+      "negative_gain_flag": false,
+      "family_id": 24,
+      "is_struct": false
+    }
+  ],
+  "families": [
+    {
+      "family_id": 0,
+      "cluster_ids": [
+        0
+      ],
+      "members": [
+        0
+      ],
+      "effect": -0.0015007605930405829,
+      "label": "family_0"
+    },
+    {
+      "family_id": 1,
+      "cluster_ids": [
+        1
+      ],
+      "members": [
+        3,
+        62
+      ],
+      "effect": 0.0033226224392505707,
+      "label": "family_1"
+    },
+    {
+      "family_id": 2,
+      "cluster_ids": [
+        2
+      ],
+      "members": [
+        5,
+        24
+      ],
+      "effect": -0.0026742070768863914,
+      "label": "family_2"
+    },
+    {
+      "family_id": 3,
+      "cluster_ids": [
+        3
+      ],
+      "members": [
+        8
+      ],
+      "effect": 0.0005441169539807233,
+      "label": "family_3"
+    },
+    {
+      "family_id": 4,
+      "cluster_ids": [
+        4
+      ],
+      "members": [
+        9
+      ],
+      "effect": 0.0011019028909469617,
+      "label": "family_4"
+    },
+    {
+      "family_id": 5,
+      "cluster_ids": [
+        5
+      ],
+      "members": [
+        10,
+        30
+      ],
+      "effect": -0.0014392910294386586,
+      "label": "family_5"
+    },
+    {
+      "family_id": 6,
+      "cluster_ids": [
+        6
+      ],
+      "members": [
+        11
+      ],
+      "effect": -0.0073404574899599345,
+      "label": "family_6"
+    },
+    {
+      "family_id": 7,
+      "cluster_ids": [
+        7
+      ],
+      "members": [
+        12
+      ],
+      "effect": 0.0022365653791506027,
+      "label": "family_7"
+    },
+    {
+      "family_id": 8,
+      "cluster_ids": [
+        8
+      ],
+      "members": [
+        14
+      ],
+      "effect": -0.0012608053003701585,
+      "label": "family_8"
+    },
+    {
+      "family_id": 9,
+      "cluster_ids": [
+        9
+      ],
+      "members": [
+        18
+      ],
+      "effect": -0.0018560880940609837,
+      "label": "family_9"
+    },
+    {
+      "family_id": 10,
+      "cluster_ids": [
+        10
+      ],
+      "members": [
+        20
+      ],
+      "effect": -0.0022772017821342822,
+      "label": "family_10"
+    },
+    {
+      "family_id": 11,
+      "cluster_ids": [
+        11
+      ],
+      "members": [
+        25
+      ],
+      "effect": -0.00035008464821010616,
+      "label": "family_11"
+    },
+    {
+      "family_id": 12,
+      "cluster_ids": [
+        12
+      ],
+      "members": [
+        27
+      ],
+      "effect": 0.00044383677813446926,
+      "label": "family_12"
+    },
+    {
+      "family_id": 13,
+      "cluster_ids": [
+        13
+      ],
+      "members": [
+        28
+      ],
+      "effect": 0.0017566092089577104,
+      "label": "family_13"
+    },
+    {
+      "family_id": 14,
+      "cluster_ids": [
+        14
+      ],
+      "members": [
+        31
+      ],
+      "effect": -0.0011471140249241433,
+      "label": "family_14"
+    },
+    {
+      "family_id": 15,
+      "cluster_ids": [
+        15
+      ],
+      "members": [
+        32
+      ],
+      "effect": -0.0006926323969953444,
+      "label": "family_15"
+    },
+    {
+      "family_id": 16,
+      "cluster_ids": [
+        16
+      ],
+      "members": [
+        38
+      ],
+      "effect": -0.002340630475902671,
+      "label": "family_16"
+    },
+    {
+      "family_id": 17,
+      "cluster_ids": [
+        17
+      ],
+      "members": [
+        39
+      ],
+      "effect": -0.00240980980924262,
+      "label": "family_17"
+    },
+    {
+      "family_id": 18,
+      "cluster_ids": [
+        18
+      ],
+      "members": [
+        41
+      ],
+      "effect": 0.004272167415203202,
+      "label": "family_18"
+    },
+    {
+      "family_id": 19,
+      "cluster_ids": [
+        19
+      ],
+      "members": [
+        42
+      ],
+      "effect": -0.0006823095187121666,
+      "label": "family_19"
+    },
+    {
+      "family_id": 20,
+      "cluster_ids": [
+        20
+      ],
+      "members": [
+        44
+      ],
+      "effect": -0.0008235129349313944,
+      "label": "family_20"
+    },
+    {
+      "family_id": 21,
+      "cluster_ids": [
+        21
+      ],
+      "members": [
+        45
+      ],
+      "effect": 0.0007454699042461772,
+      "label": "family_21"
+    },
+    {
+      "family_id": 22,
+      "cluster_ids": [
+        22
+      ],
+      "members": [
+        46
+      ],
+      "effect": 0.0012560909856806188,
+      "label": "family_22"
+    },
+    {
+      "family_id": 23,
+      "cluster_ids": [
+        23
+      ],
+      "members": [
+        47
+      ],
+      "effect": -0.0010287687987964621,
+      "label": "family_23"
+    },
+    {
+      "family_id": 24,
+      "cluster_ids": [
+        24
+      ],
+      "members": [
+        50
+      ],
+      "effect": -0.0008376577034357459,
+      "label": "family_24"
+    }
+  ],
+  "filters": [
+    {
+      "filter_idx": 0,
+      "cluster_id": 0,
+      "activation": 0.6454762300476432,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.16275307536125183,
+      "family_id": 0,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 1,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.06209734082221985,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 2,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.06230870634317398,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 3,
+      "cluster_id": 1,
+      "activation": 0.5189120298139751,
+      "offset": -1,
+      "status": "ACTIVE",
+      "w1": 0.2579696774482727,
+      "family_id": 1,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 4,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.1558026820421219,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 5,
+      "cluster_id": 2,
+      "activation": 0.6077202739603818,
+      "offset": -1,
+      "status": "ACTIVE",
+      "w1": -0.00037591633736155927,
+      "family_id": 2,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 6,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.0722779706120491,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 7,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.16834130883216858,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 8,
+      "cluster_id": 3,
+      "activation": 0.7831217443309725,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": 0.04863635450601578,
+      "family_id": 3,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 9,
+      "cluster_id": 4,
+      "activation": 0.880508592672646,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": 0.08760073781013489,
+      "family_id": 4,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 10,
+      "cluster_id": 5,
+      "activation": 0.5711617320636287,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.12416212260723114,
+      "family_id": 5,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 11,
+      "cluster_id": 6,
+      "activation": 1.5928653425574302,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.32258346676826477,
+      "family_id": 6,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 12,
+      "cluster_id": 7,
+      "activation": 1.101589604228735,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": 0.14212150871753693,
+      "family_id": 7,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 13,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.07202371209859848,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 14,
+      "cluster_id": 8,
+      "activation": 0.5665427108481527,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.1557806134223938,
+      "family_id": 8,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 15,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.10569813847541809,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 16,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.1265413463115692,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 17,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.06742427498102188,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 18,
+      "cluster_id": 9,
+      "activation": 0.9848070987798273,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.13193057477474213,
+      "family_id": 9,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 19,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "DEAD",
+      "w1": 0.00399847561493516,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 20,
+      "cluster_id": 10,
+      "activation": 0.8766662590019405,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.18182988464832306,
+      "family_id": 10,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 21,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "DEAD",
+      "w1": -0.0008483213605359197,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 22,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.06466858834028244,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 23,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.06209409236907959,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 24,
+      "cluster_id": 2,
+      "activation": 1.304060707435012,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.14337219297885895,
+      "family_id": 2,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 25,
+      "cluster_id": 11,
+      "activation": 0.5868066002223641,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.041761502623558044,
+      "family_id": 11,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 26,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "DEAD",
+      "w1": -0.0002640125167090446,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 27,
+      "cluster_id": 12,
+      "activation": 0.7373394969031215,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": 0.042136050760746,
+      "family_id": 12,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 28,
+      "cluster_id": 13,
+      "activation": 1.239155586630106,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": 0.09923099726438522,
+      "family_id": 13,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 29,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.058677639812231064,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 30,
+      "cluster_id": 5,
+      "activation": 0.3437360575599596,
+      "offset": 2,
+      "status": "ACTIVE",
+      "w1": -0.08679252117872238,
+      "family_id": 5,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 31,
+      "cluster_id": 14,
+      "activation": 0.7540422429926693,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.10649003088474274,
+      "family_id": 14,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 32,
+      "cluster_id": 15,
+      "activation": 0.4626502499449998,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.10479680448770523,
+      "family_id": 15,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 33,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "DEAD",
+      "w1": 0.001879289047792554,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 34,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.06673819571733475,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 35,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "DEAD",
+      "w1": 0.010479229502379894,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 36,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.05937987193465233,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 37,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "DEAD",
+      "w1": -1.1460915629868396e-06,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 38,
+      "cluster_id": 16,
+      "activation": 1.0255079472586512,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.15976876020431519,
+      "family_id": 16,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 39,
+      "cluster_id": 17,
+      "activation": 0.9733250557109714,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.17330971360206604,
+      "family_id": 17,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 40,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.08286986500024796,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 41,
+      "cluster_id": 18,
+      "activation": 1.3073185623437167,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": 0.2287519872188568,
+      "family_id": 18,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 42,
+      "cluster_id": 19,
+      "activation": 0.457094528645277,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.10448969155550003,
+      "family_id": 19,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 43,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.1123427152633667,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 44,
+      "cluster_id": 20,
+      "activation": 0.6744209189713001,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.08547466993331909,
+      "family_id": 20,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 45,
+      "cluster_id": 21,
+      "activation": 0.5956789658144116,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": 0.08760237693786621,
+      "family_id": 21,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 46,
+      "cluster_id": 22,
+      "activation": 0.9253471874296665,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": 0.0950198695063591,
+      "family_id": 22,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 47,
+      "cluster_id": 23,
+      "activation": 0.6512307353802025,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.11058110743761063,
+      "family_id": 23,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 48,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.14411261677742004,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 49,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.07510720193386078,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 50,
+      "cluster_id": 24,
+      "activation": 0.561053244035691,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": -0.10451065003871918,
+      "family_id": 24,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 51,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.08908620476722717,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 52,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "DEAD",
+      "w1": 0.014429550617933273,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 53,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.1616232842206955,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 54,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.1299888640642166,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 55,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "DEAD",
+      "w1": 0.00072196323890239,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 56,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.11243107169866562,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 57,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.0934746265411377,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 58,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.10618099570274353,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 59,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "DEAD",
+      "w1": 0.000697760668117553,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 60,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": 0.036595579236745834,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 61,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "UNINFORMATIVE",
+      "w1": -0.06195903196930885,
+      "family_id": null,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 62,
+      "cluster_id": 1,
+      "activation": 0.6564949399121106,
+      "offset": 0,
+      "status": "ACTIVE",
+      "w1": 0.15037435293197632,
+      "family_id": 1,
+      "is_struct": false
+    },
+    {
+      "filter_idx": 63,
+      "cluster_id": null,
+      "activation": null,
+      "offset": 0,
+      "status": "DEAD",
+      "w1": 0.0011992817744612694,
+      "family_id": null,
+      "is_struct": false
+    }
+  ]
+}

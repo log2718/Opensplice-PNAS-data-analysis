@@ -1,0 +1,547 @@
+[
+  {
+    "category": "dedup",
+    "path": "dedup/cluster_effects.csv",
+    "kind": "csv"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/cluster_effects.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/cluster_logos_core.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/cluster_logos_full.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/cluster_positional_kernel_heatmap_order1.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/cluster_positional_kernels_order1.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/coherence.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/family_report.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_0.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_1.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_10.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_11.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_12.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_13.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_14.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_15.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_16.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_17.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_18.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_19.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_2.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_20.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_3.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_4.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_5.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_6.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_7.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_8.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/logos/cluster_9.png",
+    "kind": "png"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/motif_arrays.json",
+    "kind": "json"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/motif_positional_arrays.json",
+    "kind": "json"
+  },
+  {
+    "category": "dedup",
+    "path": "dedup/summary.json",
+    "kind": "json"
+  },
+  {
+    "category": "filters",
+    "path": "filters/filter_arrays.json",
+    "kind": "json"
+  },
+  {
+    "category": "filters",
+    "path": "filters/first_order_effects.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/h_functions.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_0.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_1.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_10.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_11.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_12.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_13.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_14.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_15.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_16.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_17.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_18.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_19.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_2.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_20.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_21.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_22.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_23.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_24.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_25.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_26.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_27.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_28.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_29.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_3.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_30.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_31.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_32.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_33.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_34.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_35.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_36.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_37.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_38.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_39.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_4.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_40.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_41.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_42.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_43.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_44.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_45.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_46.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_47.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_48.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_49.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_5.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_50.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_51.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_52.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_53.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_54.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_55.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_56.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_57.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_58.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_59.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_6.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_60.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_61.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_62.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_63.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_7.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_8.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos/filter_9.png",
+    "kind": "png"
+  },
+  {
+    "category": "filters",
+    "path": "filters/logos.png",
+    "kind": "png"
+  },
+  {
+    "category": "positional",
+    "path": "positional/positional_arrays.json",
+    "kind": "json"
+  },
+  {
+    "category": "positional",
+    "path": "positional/positional_kernel_heatmap_order1.png",
+    "kind": "png"
+  },
+  {
+    "category": "positional",
+    "path": "positional/positional_kernels_order1.png",
+    "kind": "png"
+  },
+  {
+    "category": "root",
+    "path": "tuner.png",
+    "kind": "png"
+  },
+  {
+    "category": "validation",
+    "path": "validation/activation_distributions.png",
+    "kind": "png"
+  },
+  {
+    "category": "validation",
+    "path": "validation/dashboard_arrays.json",
+    "kind": "json"
+  },
+  {
+    "category": "validation",
+    "path": "validation/global_stats.csv",
+    "kind": "csv"
+  },
+  {
+    "category": "validation",
+    "path": "validation/order_comparison.png",
+    "kind": "png"
+  },
+  {
+    "category": "validation",
+    "path": "validation/per_filter_stats.csv",
+    "kind": "csv"
+  }
+]
